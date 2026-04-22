@@ -12,9 +12,29 @@ const RESET_ACTIONS = [
   { key: 'roster', label: 'Roster', countKey: 'roster', description: 'Clears roster entries and wipes dependent competitive data for a fresh rebuild.' },
 ]
 
-export default function Data({ state, exportData, importData, clearDataScope, showToast }) {
+function formatSnapshotDate(dateStr) {
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return dateStr || 'Unknown'
+  return date.toLocaleString()
+}
+
+export default function Data({
+  state,
+  exportData,
+  importData,
+  createManualSnapshot,
+  restoreAutosave,
+  deleteAutosave,
+  autosaveSnapshots = [],
+  clearDataScope,
+  persistenceError,
+  lastSavedAt,
+  showToast,
+}) {
   const fileInputRef = useRef(null)
   const [isImporting, setIsImporting] = useState(false)
+  const [restoringSnapshotId, setRestoringSnapshotId] = useState(null)
+  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false)
 
   const summary = useMemo(() => ({
     roster: state.wrestlers?.length || 0,
@@ -65,6 +85,48 @@ export default function Data({ state, exportData, importData, clearDataScope, sh
     }
   }
 
+  const handleRestoreAutosave = async (snapshotId) => {
+    const confirmed = window.confirm('Restore this autosave snapshot? Your current universe will be replaced, but the current state will still remain in recent autosaves.')
+    if (!confirmed) return
+
+    try {
+      setRestoringSnapshotId(snapshotId)
+      await restoreAutosave(snapshotId)
+      showToast('Autosave restored')
+    } catch (error) {
+      showToast(error?.message || 'Could not restore autosave')
+    } finally {
+      setRestoringSnapshotId(null)
+    }
+  }
+
+  const handleDeleteAutosave = async (snapshotId) => {
+    const confirmed = window.confirm('Delete this autosave snapshot?')
+    if (!confirmed) return
+
+    try {
+      await deleteAutosave(snapshotId)
+      showToast('Autosave deleted')
+    } catch (error) {
+      showToast(error?.message || 'Could not delete autosave')
+    }
+  }
+
+  const handleCreateSnapshot = async () => {
+    const label = window.prompt('Name this snapshot (optional):', 'Manual snapshot')
+    if (label === null) return
+
+    try {
+      setIsCreatingSnapshot(true)
+      await createManualSnapshot(label)
+      showToast('Snapshot created')
+    } catch (error) {
+      showToast(error?.message || 'Could not create snapshot')
+    } finally {
+      setIsCreatingSnapshot(false)
+    }
+  }
+
   const handleClearScope = (scope, label) => {
     const confirmed = window.confirm(`Delete ${label.toLowerCase()} data from this universe? This cannot be undone unless you have a backup.`)
     if (!confirmed) return
@@ -92,6 +154,17 @@ export default function Data({ state, exportData, importData, clearDataScope, sh
             <div className="data-card-subtle">What your current save includes</div>
           </div>
 
+          <div className="data-status-row">
+            <div className="data-status-card">
+              <span>Primary Save</span>
+              <strong>{lastSavedAt ? `Saved ${formatSnapshotDate(lastSavedAt)}` : 'Waiting for first save'}</strong>
+            </div>
+            <div className="data-status-card">
+              <span>Recovery Snapshots</span>
+              <strong>{autosaveSnapshots.length} available</strong>
+            </div>
+          </div>
+
           <div className="data-stats-grid">
             <div className="data-stat-card"><strong>{summary.roster}</strong><span>Roster Entries</span></div>
             <div className="data-stat-card"><strong>{summary.shows}</strong><span>Shows</span></div>
@@ -109,6 +182,12 @@ export default function Data({ state, exportData, importData, clearDataScope, sh
             <div className="data-card-heading">Backup Tools</div>
             <div className="data-card-subtle">Export your full universe or restore it from a backup file</div>
           </div>
+
+          {persistenceError && (
+            <div className="data-alert">
+              {persistenceError}
+            </div>
+          )}
 
           <div className="data-action-grid">
             <div className="data-action-card">
@@ -138,6 +217,66 @@ export default function Data({ state, exportData, importData, clearDataScope, sh
               />
             </div>
           </div>
+        </section>
+
+        <section className="data-card">
+          <div className="data-card-header">
+            <div className="data-card-heading">Autosave Recovery</div>
+            <div className="data-card-subtle">Rolling local snapshots stored in IndexedDB for safer recovery</div>
+          </div>
+
+          <div className="data-autosave-toolbar">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={isCreatingSnapshot}
+              onClick={handleCreateSnapshot}
+            >
+              {isCreatingSnapshot ? 'Creating...' : 'Create Snapshot Now'}
+            </button>
+          </div>
+
+          {autosaveSnapshots.length === 0 ? (
+            <div className="data-note-row">No autosave snapshots are available yet. Once you keep working in the app, WUM will build a rolling recovery history automatically.</div>
+          ) : (
+            <div className="data-autosave-list">
+              {autosaveSnapshots.map((snapshot) => (
+                <div key={snapshot.id} className="data-autosave-row">
+                  <div className="data-autosave-main">
+                    <div className="data-action-title">{snapshot.label || 'Autosave'}</div>
+                    <div className="data-action-copy">
+                      {formatSnapshotDate(snapshot.createdAt)}
+                      {snapshot.currentDate ? ` • Universe date ${snapshot.currentDate}` : ''}
+                    </div>
+                    <div className="data-chip-row">
+                      <span className="data-chip">Roster {snapshot.counts?.roster ?? 0}</span>
+                      <span className="data-chip">Shows {snapshot.counts?.shows ?? 0}</span>
+                      <span className="data-chip">Titles {snapshot.counts?.titles ?? 0}</span>
+                      <span className="data-chip">Stories {snapshot.counts?.stories ?? 0}</span>
+                      <span className="data-chip">Matches {snapshot.counts?.matches ?? 0}</span>
+                    </div>
+                  </div>
+                  <div className="data-autosave-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={restoringSnapshotId === snapshot.id}
+                      onClick={() => handleRestoreAutosave(snapshot.id)}
+                    >
+                      {restoringSnapshotId === snapshot.id ? 'Restoring...' : 'Restore'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => handleDeleteAutosave(snapshot.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="data-card">

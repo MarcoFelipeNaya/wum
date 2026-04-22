@@ -22,6 +22,21 @@ export default function App() {
 
   const pageProps = { state, showToast, ...store }
 
+  if (!store.isHydrated) {
+    return (
+      <div className="app">
+        <main className="app-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+          <div className="card" style={{ maxWidth: 420, textAlign: 'center' }}>
+            <h1 className="page-title" style={{ marginBottom: 8 }}>Loading Universe</h1>
+            <p style={{ color: 'var(--text2)', margin: 0 }}>
+              Restoring your saved data and autosaves from local storage.
+            </p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <Nav current={page} onNavigate={setPage} />

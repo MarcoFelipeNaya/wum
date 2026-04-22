@@ -1,9 +1,20 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { fmt, addDays, DAY_NAMES, todayStr, getCustomDow, daysBetween } from './utils/dates.js'
+import {
+  loadPrimaryState,
+  savePrimaryState,
+  createAutosaveSnapshot,
+  listAutosaveSnapshots,
+  loadAutosaveSnapshot,
+  trimAutosaveSnapshots,
+  deleteAutosaveSnapshot,
+} from './utils/persistence.js'
 
 const ALLOWED_PARTICIPANT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
 const SAVE_KEY = 'wum-state'
 const EXPORT_VERSION = 1
+const AUTOSAVE_INTERVAL_MS = 2 * 60 * 1000
+const SAVE_DEBOUNCE_MS = 250
 
 function findNextShowDay(fromDate, shows, specialShows = []) {
   const start = typeof fromDate === 'string' ? fromDate : fmt(fromDate)
@@ -454,24 +465,157 @@ function normalizeStoredState(rawState) {
   return parsed
 }
 
-export function useStore() {
-  const [state, setState] = useState(() => {
-    try {
-      const saved = localStorage.getItem(SAVE_KEY)
-      if (!saved) return INITIAL_STATE
-      return normalizeStoredState(JSON.parse(saved))
-    } catch {
-      return INITIAL_STATE
-    }
-  })
+function buildAutosaveSummary(state, label = 'Autosave') {
+  return {
+    id: `autosave-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    label,
+    createdAt: new Date().toISOString(),
+    state,
+    counts: {
+      roster: state.wrestlers?.length || 0,
+      shows: state.shows?.length || 0,
+      titles: state.titles?.length || 0,
+      tournaments: state.tournaments?.length || 0,
+      teams: state.teams?.length || 0,
+      factions: state.factions?.length || 0,
+      stories: state.stories?.length || 0,
+      matches: state.matches?.length || 0,
+    },
+    currentDate: state.currentDate || null,
+  }
+}
 
-  const update = useCallback((fn) => setState((s) => {
-    const next = { ...fn({ ...s }) }
+export function useStore() {
+  const [state, setState] = useState(INITIAL_STATE)
+  const [isHydrated, setIsHydrated] = useState(false)
+  const [autosaveSnapshots, setAutosaveSnapshots] = useState([])
+  const [persistenceError, setPersistenceError] = useState(null)
+  const [lastSavedAt, setLastSavedAt] = useState(null)
+  const persistTimeoutRef = useRef(null)
+  const pendingPersistRef = useRef(null)
+  const lastAutosaveRef = useRef(Date.now())
+
+  const refreshAutosaveSnapshots = useCallback(async () => {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(next))
-    } catch {}
+      const snapshots = await listAutosaveSnapshots()
+      setAutosaveSnapshots(snapshots)
+    } catch (error) {
+      setPersistenceError(error?.message || 'Could not read autosaves')
+    }
+  }, [])
+
+  const persistState = useCallback((nextState, options = {}) => {
+    pendingPersistRef.current = {
+      state: nextState,
+      forceSnapshot: Boolean(options.forceSnapshot),
+      snapshotLabel: options.snapshotLabel || 'Autosave',
+    }
+
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current)
+    }
+
+    persistTimeoutRef.current = setTimeout(async () => {
+      const pending = pendingPersistRef.current
+      if (!pending) return
+
+      try {
+        const savedAt = new Date().toISOString()
+        await savePrimaryState(pending.state, {
+          updatedAt: savedAt,
+          version: EXPORT_VERSION,
+        })
+
+        const shouldSnapshot =
+          pending.forceSnapshot || (Date.now() - lastAutosaveRef.current >= AUTOSAVE_INTERVAL_MS)
+
+        if (shouldSnapshot) {
+          await createAutosaveSnapshot(buildAutosaveSummary(pending.state, pending.snapshotLabel))
+          await trimAutosaveSnapshots()
+          lastAutosaveRef.current = Date.now()
+          await refreshAutosaveSnapshots()
+        }
+
+        try {
+          localStorage.removeItem(SAVE_KEY)
+        } catch {}
+
+        setLastSavedAt(savedAt)
+        setPersistenceError(null)
+      } catch (error) {
+        setPersistenceError(error?.message || 'Could not save universe data')
+      }
+    }, SAVE_DEBOUNCE_MS)
+  }, [refreshAutosaveSnapshots])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function hydrate() {
+      try {
+        const persisted = await loadPrimaryState()
+        let normalized = null
+        let migratedFromLocalStorage = false
+
+        if (persisted?.state) {
+          normalized = normalizeStoredState(persisted.state)
+          if (persisted.updatedAt) setLastSavedAt(persisted.updatedAt)
+        } else {
+          try {
+            const legacySaved = localStorage.getItem(SAVE_KEY)
+            if (legacySaved) {
+              normalized = normalizeStoredState(JSON.parse(legacySaved))
+              migratedFromLocalStorage = true
+            }
+          } catch {}
+        }
+
+        const safeState = normalized || INITIAL_STATE
+        const snapshots = await listAutosaveSnapshots()
+
+        if (cancelled) return
+
+        setState(safeState)
+        setAutosaveSnapshots(snapshots)
+        setIsHydrated(true)
+        lastAutosaveRef.current = Date.now()
+
+        if (migratedFromLocalStorage) {
+          const migratedAt = new Date().toISOString()
+          await savePrimaryState(safeState, {
+            updatedAt: migratedAt,
+            version: EXPORT_VERSION,
+          })
+          await createAutosaveSnapshot(buildAutosaveSummary(safeState, 'Migration backup'))
+          await trimAutosaveSnapshots()
+          await refreshAutosaveSnapshots()
+          setLastSavedAt(migratedAt)
+          try {
+            localStorage.removeItem(SAVE_KEY)
+          } catch {}
+        }
+      } catch (error) {
+        if (cancelled) return
+        setPersistenceError(error?.message || 'Could not load saved universe')
+        setIsHydrated(true)
+      }
+    }
+
+    hydrate()
+
+    return () => {
+      cancelled = true
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
+    }
+  }, [refreshAutosaveSnapshots])
+
+  const update = useCallback((fn, persistOptions = {}) => setState((s) => {
+    const next = { ...fn({ ...s }) }
+    if (isHydrated) {
+      persistState(next, persistOptions)
+    }
     return next
-  }), [])
+  }), [isHydrated, persistState])
 
   const genId = (s) => {
     s.nextId += 1
@@ -1224,7 +1368,7 @@ export function useStore() {
     state,
   }), [state])
 
-  const importData = useCallback((rawInput) => {
+  const importData = useCallback(async (rawInput) => {
     let parsed
     try {
       parsed = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput
@@ -1240,11 +1384,34 @@ export function useStore() {
     const normalized = normalizeStoredState(incomingState)
 
     setState(normalized)
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(normalized))
-    } catch {}
+    persistState(normalized, { forceSnapshot: true, snapshotLabel: 'Imported backup' })
     return normalized
-  }, [])
+  }, [persistState])
+
+  const createManualSnapshot = useCallback(async (label = 'Manual snapshot') => {
+    const safeLabel = String(label || 'Manual snapshot').trim() || 'Manual snapshot'
+    await createAutosaveSnapshot(buildAutosaveSummary(state, safeLabel))
+    await trimAutosaveSnapshots()
+    await refreshAutosaveSnapshots()
+    return true
+  }, [state, refreshAutosaveSnapshots])
+
+  const restoreAutosave = useCallback(async (snapshotId) => {
+    const snapshot = await loadAutosaveSnapshot(snapshotId)
+    if (!snapshot?.state) {
+      throw new Error('That autosave snapshot could not be loaded.')
+    }
+
+    const normalized = normalizeStoredState(snapshot.state)
+    setState(normalized)
+    persistState(normalized, { forceSnapshot: true, snapshotLabel: 'Restored autosave' })
+    return normalized
+  }, [persistState])
+
+  const deleteAutosave = useCallback(async (snapshotId) => {
+    await deleteAutosaveSnapshot(snapshotId)
+    await refreshAutosaveSnapshots()
+  }, [refreshAutosaveSnapshots])
 
   const clearDataScope = useCallback((scope) => {
     setState((current) => {
@@ -1324,21 +1491,25 @@ export function useStore() {
           nextId: INITIAL_STATE.nextId,
           currentDate: todayStr(),
         })
-        try {
-          localStorage.setItem(SAVE_KEY, JSON.stringify(reset))
-        } catch {}
+        if (isHydrated) {
+          persistState(reset, { forceSnapshot: true, snapshotLabel: 'Fresh universe reset' })
+        }
         return reset
       }
 
-      try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify(next))
-      } catch {}
+      if (isHydrated) {
+        persistState(next, { forceSnapshot: true, snapshotLabel: `Cleared ${scope}` })
+      }
       return next
     })
-  }, [])
+  }, [isHydrated, persistState])
 
   return {
     state,
+    isHydrated,
+    persistenceError,
+    lastSavedAt,
+    autosaveSnapshots,
     addWrestler,
     editWrestler,
     deleteWrestler,
@@ -1378,6 +1549,9 @@ export function useStore() {
     moveDayCardItem,
     exportData,
     importData,
+    createManualSnapshot,
+    restoreAutosave,
+    deleteAutosave,
     clearDataScope,
   }
 }

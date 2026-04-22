@@ -1239,47 +1239,36 @@ export default function DayMatchesModal({
                           )}
 
                           {editLayout.isTeamBased && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                              <div>
-                                {editEligibleTeams.length > 0 && (
-                                  <div style={{ marginBottom: 8 }}>
-                                    <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {editLayout.teamA.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                                    <select name="teamA_saved" defaultValue="" style={{ ...selectStyle, width: '100%' }}>
-                                      <option value="">Manual selection</option>
-                                      {editEligibleTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-                                    </select>
-                                  </div>
-                                )}
-                                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{editLayout.teamA.label}</div>
-                                <div style={{ display: 'grid', gap: 8 }}>
-                                  {Array.from({ length: editLayout.teamA.size }).map((_, index) => (
-                                    <select key={index} name={`teamA_${index}`} defaultValue={getParticipantIdsFromMatch(m)[index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
-                                      <option value="">Select wrestler</option>
-                                      {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                    </select>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                {editEligibleTeams.length > 0 && (
-                                  <div style={{ marginBottom: 8 }}>
-                                    <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {editLayout.teamB.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                                    <select name="teamB_saved" defaultValue="" style={{ ...selectStyle, width: '100%' }}>
-                                      <option value="">Manual selection</option>
-                                      {editEligibleTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-                                    </select>
-                                  </div>
-                                )}
-                                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{editLayout.teamB.label}</div>
-                                <div style={{ display: 'grid', gap: 8 }}>
-                                  {Array.from({ length: editLayout.teamB.size }).map((_, index) => (
-                                    <select key={index} name={`teamB_${index}`} defaultValue={getParticipantIdsFromMatch(m)[editLayout.teamA.size + index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
-                                      <option value="">Select wrestler</option>
-                                      {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                    </select>
-                                  ))}
-                                </div>
-                              </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${editLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
+                              {(() => {
+                                let participantOffset = 0
+                                return editLayout.teams.map((team, teamIndex) => {
+                                  const teamStart = participantOffset
+                                  participantOffset += team.size
+                                  return (
+                                    <div key={team.label}>
+                                      {editEligibleTeams.length > 0 && (
+                                        <div style={{ marginBottom: 8 }}>
+                                          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
+                                          <select name={`team${teamIndex}_saved`} defaultValue="" style={{ ...selectStyle, width: '100%' }}>
+                                            <option value="">Manual selection</option>
+                                            {editEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
+                                          </select>
+                                        </div>
+                                      )}
+                                      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
+                                      <div style={{ display: 'grid', gap: 8 }}>
+                                        {Array.from({ length: team.size }).map((_, index) => (
+                                          <select key={index} name={`team${teamIndex}_${index}`} defaultValue={getParticipantIdsFromMatch(m)[teamStart + index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
+                                            <option value="">Select wrestler</option>
+                                            {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                          </select>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              })()}
                             </div>
                           )}
 

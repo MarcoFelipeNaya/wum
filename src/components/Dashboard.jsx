@@ -198,22 +198,23 @@ export default function Dashboard({ state }) {
     return participantNames.join(' vs ')
   }
 
-  const getStoryParticipantName = (participant) => {
+  function getStoryParticipantName(participant) {
     if (participant.type === 'wrestler') return getW(participant.id)?.name || 'Unknown'
     if (participant.type === 'team') return getTeam(participant.id)?.name || 'Unknown Team'
     if (participant.type === 'faction') return getFaction(participant.id)?.name || 'Unknown Faction'
     return 'Unknown'
   }
 
-  const getStoryParticipantIds = (story) =>
-    (story.participants || []).flatMap((participant) => {
+  function getStoryParticipantIds(story) {
+    return (story.participants || []).flatMap((participant) => {
       if (participant.type === 'wrestler') return [participant.id]
       if (participant.type === 'team') return getTeam(participant.id)?.memberIds || []
       if (participant.type === 'faction') return getFaction(participant.id)?.memberIds || []
       return []
     })
+  }
 
-  const getStoryHeat = (story) => {
+  function getStoryHeat(story) {
     const participantIds = getStoryParticipantIds(story)
     const storyMatchCount = matches.filter((match) => getParticipantIds(match).some((id) => participantIds.includes(id))).length
     return storyMatchCount + (story.segments?.length || 0)
