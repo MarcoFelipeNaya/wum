@@ -64,76 +64,78 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app-layout">
       <Nav current={page} onNavigate={setPage} />
 
-      {(pwaInstallAvailable || pwaUpdateAvailable) && (
-        <div className="pwa-banner-shell">
-          {pwaInstallAvailable && !pwaUpdateAvailable && (
-            <div className="pwa-banner">
-              <div>
-                <div className="pwa-banner-title">Install Heat</div>
-                <div className="pwa-banner-copy">Add Heat to your desktop so it launches like its own app.</div>
+      <div className="app-content">
+        {(pwaInstallAvailable || pwaUpdateAvailable) && (
+          <div className="pwa-banner-shell">
+            {pwaInstallAvailable && !pwaUpdateAvailable && (
+              <div className="pwa-banner">
+                <div>
+                  <div className="pwa-banner-title">Install Heat</div>
+                  <div className="pwa-banner-copy">Add Heat to your desktop for the full experience.</div>
+                </div>
+                <div className="pwa-banner-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPwaInstallAvailable(false)}
+                  >
+                    Later
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => window.dispatchEvent(new CustomEvent('heat-pwa-trigger-install'))}
+                  >
+                    Install
+                  </button>
+                </div>
               </div>
-              <div className="pwa-banner-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setPwaInstallAvailable(false)}
-                >
-                  Later
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => window.dispatchEvent(new CustomEvent('heat-pwa-trigger-install'))}
-                >
-                  Install
-                </button>
-              </div>
-            </div>
-          )}
+            )}
 
-          {pwaUpdateAvailable && (
-            <div className="pwa-banner">
-              <div>
-                <div className="pwa-banner-title">Heat Update Ready</div>
-                <div className="pwa-banner-copy">A newer local app shell is ready. Refresh once to switch over.</div>
+            {pwaUpdateAvailable && (
+              <div className="pwa-banner">
+                <div>
+                  <div className="pwa-banner-title">Update Ready</div>
+                  <div className="pwa-banner-copy">A new version is ready. Refresh to apply.</div>
+                </div>
+                <div className="pwa-banner-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPwaUpdateAvailable(false)}
+                  >
+                    Later
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => window.dispatchEvent(new CustomEvent('heat-pwa-apply-update'))}
+                  >
+                    Refresh
+                  </button>
+                </div>
               </div>
-              <div className="pwa-banner-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setPwaUpdateAvailable(false)}
-                >
-                  Later
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => window.dispatchEvent(new CustomEvent('heat-pwa-apply-update'))}
-                >
-                  Refresh App
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
-      <main className="app-main">
-        {page === 'dashboard' && <Dashboard {...pageProps} />}
-        {page === 'roster'    && <Roster    {...pageProps} />}
-        {page === 'factions'  && <Factions  {...pageProps} />}
-        {page === 'shows'     && <Shows     {...pageProps} />}
-        {page === 'rankings'  && <Rankings  {...pageProps} />}
-        {page === 'records'   && <Records   {...pageProps} />}
-        {page === 'calendar'  && <Calendar  {...pageProps} advanceDay={store.advanceDay} />}
-        {page === 'tournaments' && <Tournaments {...pageProps} />}
-        {page === 'titles'    && <Titles    {...pageProps} />}
-        {page === 'stories'   && <Stories   {...pageProps} />}
-        {page === 'data'      && <Data      {...pageProps} />}
-      </main>
+        <main className="app-main-view">
+          {page === 'dashboard' && <Dashboard {...pageProps} />}
+          {page === 'roster'    && <Roster    {...pageProps} />}
+          {page === 'factions'  && <Factions  {...pageProps} />}
+          {page === 'shows'     && <Shows     {...pageProps} />}
+          {page === 'rankings'  && <Rankings  {...pageProps} />}
+          {page === 'records'   && <Records   {...pageProps} />}
+          {page === 'calendar'  && <Calendar  {...pageProps} advanceDay={store.advanceDay} />}
+          {page === 'tournaments' && <Tournaments {...pageProps} />}
+          {page === 'titles'    && <Titles    {...pageProps} />}
+          {page === 'stories'   && <Stories   {...pageProps} />}
+          {page === 'data'      && <Data      {...pageProps} />}
+        </main>
+      </div>
 
       <div className={`toast${toast.show ? ' show' : ''}`}>{toast.msg}</div>
     </div>

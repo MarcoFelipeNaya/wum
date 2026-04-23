@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { addDays, DAY_NAMES, fmt, getCustomDow, MONTHS_FULL, parseDate, formatUniverseDate } from '../utils/dates.js'
+import { addDays, DAY_NAMES, fmt, getCustomDow, formatUniverseDate } from '../utils/dates.js'
 import { getCalendarEventById, getCalendarEventsOnDate, specialShowOccursOnDate } from '../utils/calendarEvents.js'
+import { FiAward, FiUsers, FiLayers, FiActivity, FiSearch, FiPlus, FiCalendar, FiTarget, FiStar, FiChevronRight, FiEdit3, FiTrash2 } from 'react-icons/fi'
 import './Tournaments.css'
 
 const PARTICIPANT_OPTIONS = [4, 8, 16, 32, 64]
@@ -23,10 +24,6 @@ function getTournamentTypeLabel(matchType) {
   if (matchType === 'tag') return 'Tag Teams'
   if (matchType === 'trios') return 'Trios'
   return 'Singles'
-}
-
-function getEntryShow(entry) {
-  return entry.show || 'Universe'
 }
 
 function formatTournamentBookingLabel(dateStr, showNames) {
@@ -147,7 +144,7 @@ export default function Tournaments({
         return { ...current, selectedIds: current.selectedIds.filter((id) => id !== entryId) }
       }
       if (current.selectedIds.length >= current.participantCount) {
-        showToast(`This bracket already has ${current.participantCount} entries selected`)
+        showToast(`Limit reached: ${current.participantCount} entries`)
         return current
       }
       return { ...current, selectedIds: [...current.selectedIds, entryId] }
@@ -155,18 +152,9 @@ export default function Tournaments({
   }
 
   const handleCreateTournament = () => {
-    if (!form.name.trim()) {
-      showToast('Enter a tournament name')
-      return
-    }
-    if (form.scope === 'show' && !form.scopeShow) {
-      showToast('Choose a show for this tournament')
-      return
-    }
-    if (form.selectedIds.length !== form.participantCount) {
-      showToast(`Select exactly ${form.participantCount} participants`)
-      return
-    }
+    if (!form.name.trim()) { showToast('Enter name'); return; }
+    if (form.scope === 'show' && !form.scopeShow) { showToast('Choose brand'); return; }
+    if (form.selectedIds.length !== form.participantCount) { showToast(`Select ${form.participantCount} entries`); return; }
 
     addTournament({
       name: form.name,
@@ -178,40 +166,18 @@ export default function Tournaments({
       prizeTitleId: form.prizeTitleId || null,
       participantSourceIds: form.selectedIds,
     })
-    showToast(`${form.name.trim()} created`)
+    showToast(`${form.name.trim()} initialized`)
     setModal(null)
   }
 
   const openBookingModal = (tournamentId, roundIndex, matchId) => {
-    setBooking({
-      tournamentId,
-      roundIndex,
-      matchId,
-      date: currentDate,
-      eventId: '',
-    })
+    setBooking({ tournamentId, roundIndex, matchId, date: currentDate, eventId: '' })
   }
 
-  useEffect(() => {
-    if (!booking || bookingOptions.length === 0) return
-    setBooking((current) => {
-      if (!current) return current
-      if (bookingOptions.some((option) => option.date === current.date)) return current
-      return { ...current, date: bookingOptions[0].date }
-    })
-  }, [bookingOptions, booking])
-
   const handleConfirmBooking = () => {
-    if (!booking?.date) {
-      showToast('Choose a calendar date')
-      return
-    }
-    if (!booking?.eventId) {
-      showToast('Choose which event card should host this tournament match')
-      return
-    }
+    if (!booking?.date || !booking?.eventId) { showToast('Incomplete booking info'); return; }
     bookTournamentMatch(booking.tournamentId, booking.roundIndex, booking.matchId, booking.date, booking.eventId)
-    showToast('Tournament match booked to the calendar')
+    showToast('Match scheduled')
     setBooking(null)
   }
 
@@ -219,64 +185,40 @@ export default function Tournaments({
     if (!booking?.date) return []
     const tournament = tournaments.find((item) => item.id === booking.tournamentId)
     if (!tournament) return []
-
-    const relevantShows = tournament.scope === 'show'
-      ? shows.filter((show) => show.name === tournament.scopeShow)
-      : shows
-    const relevantShowIds = new Set(relevantShows.map((show) => show.id))
-    const relevantSpecialShows = specialShows.filter((specialShow) => relevantShowIds.has(specialShow.showId))
-
+    const relevantShows = tournament.scope === 'show' ? shows.filter((s) => s.name === tournament.scopeShow) : shows
+    const relevantShowIds = new Set(relevantShows.map((s) => s.id))
+    const relevantSpecialShows = specialShows.filter((s) => relevantShowIds.has(s.showId))
     return getCalendarEventsOnDate(booking.date, relevantShows, relevantSpecialShows)
   }, [booking, tournaments, shows, specialShows])
-
-  useEffect(() => {
-    if (!booking) return
-    if (bookingEventOptions.length === 0) return
-    setBooking((current) => {
-      if (!current) return current
-      if (bookingEventOptions.some((option) => option.id === current.eventId)) return current
-      return { ...current, eventId: bookingEventOptions[0].id }
-    })
-  }, [booking, bookingEventOptions])
 
   const TournamentCard = ({ tournament }) => {
     const champion = tournament.entries.find((entry) => entry.id === tournament.championEntryId) || null
     const bookedCount = tournament.rounds.flatMap((round) => round.matches).filter((match) => match.bookedMatchId).length
     const resolvedCount = tournament.rounds.flatMap((round) => round.matches).filter((match) => match.winnerEntryId).length
-    const accent = tournament.scope === 'show'
-      ? shows.find((show) => show.name === tournament.scopeShow)?.color || 'var(--primary)'
-      : 'var(--primary)'
+    const accent = tournament.scope === 'show' ? shows.find((s) => s.name === tournament.scopeShow)?.color || 'var(--primary)' : 'var(--primary)'
 
     return (
       <div className="tournament-card" onClick={() => setModal({ type: 'detail', id: tournament.id })}>
         <div className="tournament-card-accent" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
         <div className="tournament-card-badges">
-          <span className="tournament-card-badge" style={{ background: `${accent}22`, color: accent, borderColor: `${accent}44` }}>
-            {getTournamentTypeLabel(tournament.matchType)}
-          </span>
-          <span className="tournament-card-badge tournament-card-badge-muted">
-            {tournament.scope === 'show' ? tournament.scopeShow : 'Universe-wide'}
-          </span>
+          <span className="tournament-card-badge" style={{ background: `${accent}15`, color: accent }}>{getTournamentTypeLabel(tournament.matchType)}</span>
+          <span className="tournament-card-badge" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{tournament.scope === 'show' ? tournament.scopeShow : 'Universe'}</span>
         </div>
         <h3 className="tournament-card-name">{tournament.name}</h3>
-        <div className="tournament-card-copy">
-          {tournament.description || `${tournament.entries.length} entries fighting through ${tournament.rounds.length} round${tournament.rounds.length !== 1 ? 's' : ''}.`}
-        </div>
-        <div className="tournament-card-highlights">
-          <span className="badge badge-gray">Entries: {tournament.entries.length}</span>
-          <span className="badge badge-gray">Booked: {bookedCount}</span>
-          <span className="badge badge-gray">Decided: {resolvedCount}</span>
-        </div>
+        <p className="tournament-card-copy">{tournament.description || 'Tournament Bracket'}</p>
+        
         <div className="tournament-card-footer">
-          <div>
-            <div className="tournament-card-stat">{tournament.rounds.length}</div>
-            <div className="tournament-card-stat-label">Rounds</div>
+          <div className="tournament-card-stat-group">
+            <div className="tournament-card-stat">{tournament.entries.length}</div>
+            <div className="tournament-card-stat-label">Field</div>
           </div>
-          <div>
-            <div className="tournament-card-stat">{champion ? champion.label : 'TBD'}</div>
-            <div className="tournament-card-stat-label">Winner</div>
+          <div className="tournament-card-stat-group">
+            <div className="tournament-card-stat">{resolvedCount}/{tournament.rounds.flatMap(r => r.matches).length}</div>
+            <div className="tournament-card-stat-label">Progress</div>
           </div>
-          <div className="tournament-card-open" style={{ color: accent }}>View Bracket</div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, color: accent, fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>
+            Bracket <FiChevronRight />
+          </div>
         </div>
       </div>
     )
@@ -285,17 +227,17 @@ export default function Tournaments({
   return (
     <div className="tournaments-page">
       <div className="page-header">
-        <h1 className="page-title">Tournaments</h1>
+        <h1 className="page-title">Tournament Central</h1>
         <button className="btn btn-primary" onClick={() => setModal('add')}>
-          + Create Tournament
+          <FiPlus /> New Bracket
         </button>
       </div>
 
       <div className="tournaments-grid">
         {tournaments.length === 0 && (
-          <div className="card tournament-empty-state">
-            <div className="tournament-section-label">No tournaments yet</div>
-            <p>Create a bracket, then book each tournament match straight from its bracket card to the calendar.</p>
+          <div className="card tournament-empty-state" style={{ gridColumn: '1 / -1', padding: '60px 0', textAlign: 'center' }}>
+            <FiAward style={{ fontSize: 48, opacity: 0.1, marginBottom: 16 }} />
+            <p>No active brackets. Commision a new tournament to start the hunt for gold.</p>
           </div>
         )}
         {tournaments.map((tournament) => (
@@ -304,109 +246,49 @@ export default function Tournaments({
       </div>
 
       {modal === 'add' && (
-        <Modal title="Create Tournament" onClose={() => setModal(null)} style={{ maxWidth: '1080px' }}>
+        <Modal title="Establish Tournament Bracket" onClose={() => setModal(null)} style={{ maxWidth: '1100px' }}>
           <div className="tournament-modal-shell">
             <div className="tournament-modal-main">
-              <div className="tournament-form-grid">
+              <div className="form-group">
+                <label>Bracket Name</label>
+                <input value={form.name} onChange={(e) => setForm(c => ({ ...c, name: e.target.value }))} placeholder="e.g. G1 Climax, King of the Ring" autoFocus />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div className="form-group">
-                  <label>Tournament Name</label>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm((current) => ({ ...current, name: e.target.value.slice(0, 60) }))}
-                    placeholder="e.g. King of the Ring"
-                    autoFocus
-                  />
+                  <label>Governing Brand</label>
+                  <select value={form.scope} onChange={(e) => setForm(c => ({ ...c, scope: e.target.value, selectedIds: [] }))}>
+                    <option value="universe">Universe-wide</option>
+                    <option value="show">Brand Exclusive</option>
+                  </select>
                 </div>
-                <div className="form-group">
-                  <label>Description (Optional)</label>
-                  <textarea
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) => setForm((current) => ({ ...current, description: e.target.value.slice(0, 500) }))}
-                    placeholder="Annual battle for supremacy..."
-                  />
-                </div>
+                {form.scope === 'show' && (
+                  <div className="form-group">
+                    <label>Select Brand</label>
+                    <select value={form.scopeShow} onChange={(e) => setForm(c => ({ ...c, scopeShow: e.target.value, selectedIds: [] }))}>
+                      {shows.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              <div className="tournament-modal-card">
-                <div className="tournament-section-label">Setup</div>
-                <div className="tournament-form-grid tournament-form-grid-compact">
-                  <div className="form-group">
-                    <label>Tournament Scope</label>
-                    <select
-                      value={form.scope}
-                      onChange={(e) => setForm((current) => ({ ...current, scope: e.target.value, selectedIds: [] }))}
-                    >
-                      <option value="universe">Universe-wide</option>
-                      <option value="show">Specific Show</option>
-                    </select>
-                  </div>
-
-                  {form.scope === 'show' && (
-                    <div className="form-group">
-                      <label>Show</label>
-                      <select
-                        value={form.scopeShow}
-                        onChange={(e) => setForm((current) => ({ ...current, scopeShow: e.target.value, selectedIds: [] }))}
-                      >
-                        <option value="">Choose a show</option>
-                        {shows.map((show) => (
-                          <option key={show.id} value={show.name}>{show.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="form-group">
-                    <label>Format</label>
-                    <input value="Single Elimination" disabled />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Prize (Optional)</label>
-                    <select
-                      value={form.prizeTitleId}
-                      onChange={(e) => setForm((current) => ({ ...current, prizeTitleId: e.target.value }))}
-                    >
-                      <option value="">None</option>
-                      {titles.map((title) => (
-                        <option key={title.id} value={title.id}>{title.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="tournament-inline-group">
-                  <div className="tournament-inline-label">Match Type</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div className="form-group">
+                  <label>Talent Class</label>
                   <div className="tournament-pill-row">
-                    {[
-                      { value: 'singles', label: 'Singles' },
-                      { value: 'tag', label: 'Tag Teams' },
-                      { value: 'trios', label: 'Trios' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`tournament-pill${form.matchType === option.value ? ' active' : ''}`}
-                        onClick={() => setForm((current) => ({ ...current, matchType: option.value, selectedIds: [] }))}
-                      >
-                        {option.label}
+                    {['singles', 'tag', 'trios'].map(t => (
+                      <button key={t} className={`tournament-pill ${form.matchType === t ? 'active' : ''}`} onClick={() => setForm(c => ({ ...c, matchType: t, selectedIds: [] }))}>
+                        {t.toUpperCase()}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                <div className="tournament-inline-group">
-                  <div className="tournament-inline-label">Number of Participants</div>
+                <div className="form-group">
+                  <label>Field Size</label>
                   <div className="tournament-pill-row">
-                    {PARTICIPANT_OPTIONS.map((count) => (
-                      <button
-                        key={count}
-                        type="button"
-                        className={`tournament-pill${form.participantCount === count ? ' active' : ''}`}
-                        onClick={() => setForm((current) => ({ ...current, participantCount: count, selectedIds: current.selectedIds.slice(0, count) }))}
-                      >
-                        {count}
+                    {PARTICIPANT_OPTIONS.map(n => (
+                      <button key={n} className={`tournament-pill ${form.participantCount === n ? 'active' : ''}`} onClick={() => setForm(c => ({ ...c, participantCount: n, selectedIds: [] }))}>
+                        {n}
                       </button>
                     ))}
                   </div>
@@ -414,203 +296,77 @@ export default function Tournaments({
               </div>
 
               <div className="tournament-modal-card">
-                <div className="tournament-card-head">
-                  <div>
-                    <div className="tournament-section-label">Select Participants</div>
-                    <div className="tournament-helper-copy">{form.selectedIds.length}/{form.participantCount} selected</div>
-                  </div>
+                <div className="tournament-section-label">Field Selection ({form.selectedIds.length}/{form.participantCount})</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <input value={form.search} onChange={e => setForm(c => ({ ...c, search: e.target.value }))} placeholder="Search talent..." />
+                  <select value={form.brandFilter} onChange={e => setForm(c => ({ ...c, brandFilter: e.target.value }))}>
+                    <option value="all">All Brands</option>
+                    {availableShows.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
-
-                <div className="tournament-form-grid tournament-form-grid-compact">
-                  <div className="form-group">
-                    <label>Search</label>
-                    <input
-                      value={form.search}
-                      onChange={(e) => setForm((current) => ({ ...current, search: e.target.value }))}
-                      placeholder={form.matchType === 'singles' ? 'Search wrestlers...' : 'Search teams...'}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Brand Filter</label>
-                    <select
-                      value={form.brandFilter}
-                      onChange={(e) => setForm((current) => ({ ...current, brandFilter: e.target.value }))}
-                    >
-                      <option value="all">All Brands</option>
-                      {availableShows.map((showName) => (
-                        <option key={showName} value={showName}>{showName}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
                 <div className="tournament-entry-grid">
-                  {eligibleEntries.length === 0 && (
-                    <div className="tournament-empty-picker">
-                      No eligible {form.matchType === 'singles' ? 'wrestlers' : 'teams'} match this setup yet.
+                  {eligibleEntries.map(entry => (
+                    <div key={entry.id} className={`tournament-entry-card ${form.selectedIds.includes(entry.id) ? 'selected' : ''}`} onClick={() => handleToggleEntry(entry.id)}>
+                      <span className="tournament-entry-name">{entry.label}</span>
+                      <span className="tournament-entry-meta">{entry.show}</span>
                     </div>
-                  )}
-                  {eligibleEntries.map((entry) => {
-                    const selected = form.selectedIds.includes(entry.id)
-                    return (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        className={`tournament-entry-card${selected ? ' selected' : ''}`}
-                        onClick={() => handleToggleEntry(entry.id)}
-                      >
-                        <div className="tournament-entry-main">
-                          <div className="tournament-entry-name">{entry.label}</div>
-                          <div className="tournament-entry-meta">{entry.meta}</div>
-                        </div>
-                        <span className="tournament-entry-show">{getEntryShow(entry)}</span>
-                      </button>
-                    )
-                  })}
+                  ))}
                 </div>
               </div>
             </div>
 
             <div className="tournament-modal-side">
               <div className="tournament-modal-card">
-                <div className="tournament-section-label">Bracket Snapshot</div>
-                <div className="tournament-fact-row"><span>Format</span><strong>Single Elimination</strong></div>
-                <div className="tournament-fact-row"><span>Type</span><strong>{getTournamentTypeLabel(form.matchType)}</strong></div>
-                <div className="tournament-fact-row"><span>Entries</span><strong>{form.participantCount}</strong></div>
-                <div className="tournament-fact-row"><span>Scope</span><strong>{form.scope === 'show' ? (form.scopeShow || 'Pick a show') : 'Universe-wide'}</strong></div>
+                <div className="tournament-section-label">Selected Field</div>
+                <div className="tournament-chip-list">
+                  {form.selectedIds.map(id => (
+                    <span key={id} className="tournament-chip">{eligibleEntries.find(e => e.id === id)?.label || '...'}</span>
+                  ))}
+                </div>
               </div>
-
-              <div className="tournament-modal-card">
-                <div className="tournament-section-label">Selected</div>
-                {form.selectedIds.length === 0 ? (
-                  <div className="tournament-helper-copy">Nothing selected yet.</div>
-                ) : (
-                  <div className="tournament-chip-list">
-                    {form.selectedIds.map((selectedId) => {
-                      const entry = eligibleEntries.find((item) => item.id === selectedId)
-                        || (form.matchType === 'singles'
-                          ? wrestlers.find((wrestler) => wrestler.id === selectedId) && {
-                              id: selectedId,
-                              label: wrestlers.find((wrestler) => wrestler.id === selectedId)?.name,
-                            }
-                          : teams.find((team) => team.id === selectedId) && {
-                              id: selectedId,
-                              label: teams.find((team) => team.id === selectedId)?.name,
-                            })
-                      return (
-                        <span key={selectedId} className="tournament-chip">
-                          {entry?.label || 'Unknown'}
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              <button className="btn btn-primary" onClick={handleCreateTournament} style={{ height: 50, fontSize: 14 }}>
+                Initialize Bracket
+              </button>
             </div>
-          </div>
-
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-primary" onClick={handleCreateTournament}>
-              Create Tournament
-            </button>
           </div>
         </Modal>
       )}
 
       {modal?.type === 'detail' &&
         (() => {
-          const tournament = tournaments.find((item) => item.id === modal.id)
+          const tournament = tournaments.find(t => t.id === modal.id)
           if (!tournament) return null
-
-          const accent = tournament.scope === 'show'
-            ? shows.find((show) => show.name === tournament.scopeShow)?.color || 'var(--primary)'
-            : 'var(--primary)'
-          const champion = tournament.entries.find((entry) => entry.id === tournament.championEntryId) || null
+          const accent = tournament.scope === 'show' ? shows.find(s => s.name === tournament.scopeShow)?.color || 'var(--primary)' : 'var(--primary)'
+          const champion = tournament.entries.find(e => e.id === tournament.championEntryId)
 
           return (
             <Modal title={tournament.name} onClose={() => setModal(null)} style={{ maxWidth: '1200px' }}>
               <div className="tournament-detail-shell">
                 <div className="tournament-detail-main">
-                  <div className="tournament-detail-hero">
-                    <div className="tournament-card-badges">
-                      <span className="tournament-card-badge" style={{ background: `${accent}22`, color: accent, borderColor: `${accent}44` }}>
-                        {getTournamentTypeLabel(tournament.matchType)}
-                      </span>
-                      <span className="tournament-card-badge tournament-card-badge-muted">
-                        {tournament.scope === 'show' ? tournament.scopeShow : 'Universe-wide'}
-                      </span>
-                    </div>
-                    <div className="tournament-detail-copy">
-                      {tournament.description || 'Book bracket matches directly to the calendar and let results advance the field automatically.'}
-                    </div>
-                  </div>
-
-                  <div className="tournament-detail-stats">
-                    {[
-                      { label: 'Entries', value: tournament.entries.length },
-                      { label: 'Rounds', value: tournament.rounds.length },
-                      { label: 'Booked Matches', value: tournament.rounds.flatMap((round) => round.matches).filter((match) => match.bookedMatchId).length },
-                      { label: 'Resolved Matches', value: tournament.rounds.flatMap((round) => round.matches).filter((match) => match.winnerEntryId).length },
-                    ].map((item) => (
-                      <div key={item.label} className="tournament-detail-stat-card">
-                        <div className="tournament-detail-stat-value" style={{ color: accent }}>{item.value}</div>
-                        <div className="tournament-detail-stat-label">{item.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
                   <div className="tournament-bracket-scroll">
                     <div className="tournament-bracket-grid">
-                      {tournament.rounds.map((round, roundIndex) => (
-                        <div key={round.label + roundIndex} className="tournament-round-column">
+                      {tournament.rounds.map((round, rIndex) => (
+                        <div key={rIndex} className="tournament-round-column">
                           <div className="tournament-round-title">{round.label}</div>
                           <div className="tournament-round-stack">
-                            {round.matches.map((match, matchIndex) => {
-                              const sideALabel = getEntryLabel(tournament, match.sideAEntryId)
-                              const sideBLabel = getEntryLabel(tournament, match.sideBEntryId)
-                              const winnerLabel = match.winnerEntryId ? getEntryLabel(tournament, match.winnerEntryId) : null
-                              const bookedMatch = matches.find((calendarMatch) => calendarMatch.id === match.bookedMatchId) || null
-                              const bookedEvent = bookedMatch
-                                ? getCalendarEventById(bookedMatch.date, bookedMatch.eventId, shows, specialShows)
-                                : null
-                              const canBook = Boolean(match.sideAEntryId && match.sideBEntryId && !match.winnerEntryId && !match.bookedMatchId)
+                            {round.matches.map(match => {
+                              const sideA = getEntryLabel(tournament, match.sideAEntryId)
+                              const sideB = getEntryLabel(tournament, match.sideBEntryId)
+                              const winnerId = match.winnerEntryId
+                              const canBook = match.sideAEntryId && match.sideBEntryId && !match.winnerEntryId && !match.bookedMatchId
 
                               return (
                                 <div key={match.id} className="tournament-bracket-card">
-                                  <div className="tournament-bracket-meta">Match {matchIndex + 1}</div>
-                                  <div className={`tournament-entrant${match.winnerEntryId === match.sideAEntryId ? ' winner' : ''}`}>{sideALabel}</div>
-                                  <div className="tournament-versus">vs</div>
-                                  <div className={`tournament-entrant${match.winnerEntryId === match.sideBEntryId ? ' winner' : ''}`}>{sideBLabel}</div>
-
-                                  {winnerLabel && (
-                                    <div className="tournament-result-line">Winner: {winnerLabel}</div>
-                                  )}
-
-                                  {bookedMatch && !winnerLabel && (
-                                    <div className="tournament-booked-block">
-                                      <div className="tournament-booked-badge">Booked To Calendar</div>
-                                      <div className="tournament-result-subtle">
-                                        {bookedEvent ? `${bookedEvent.name} - ${formatUniverseDate(bookedMatch.date)}` : `Booked for ${formatUniverseDate(bookedMatch.date)}`}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {!bookedMatch && !winnerLabel && !canBook && (
-                                    <div className="tournament-result-subtle">Waiting for the previous round</div>
-                                  )}
-
+                                  <div className={`tournament-entrant ${winnerId === match.sideAEntryId ? 'winner' : ''}`}>{sideA}</div>
+                                  <div className="tournament-versus">VS</div>
+                                  <div className={`tournament-entrant ${winnerId === match.sideBEntryId ? 'winner' : ''}`}>{sideB}</div>
+                                  
                                   {canBook && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-primary btn-sm"
-                                      onClick={() => openBookingModal(tournament.id, roundIndex, match.id)}
-                                    >
-                                      Book To Calendar
+                                    <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 12 }} onClick={() => openBookingModal(tournament.id, rIndex, match.id)}>
+                                      Book Match
                                     </button>
                                   )}
+                                  {match.bookedMatchId && !winnerId && <div className="tournament-booked-badge">Scheduled</div>}
                                 </div>
                               )
                             })}
@@ -622,27 +378,15 @@ export default function Tournaments({
                 </div>
 
                 <div className="tournament-detail-side">
-                  <div className="tournament-modal-card">
-                    <div className="tournament-section-label">Tournament Actions</div>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => {
-                        deleteTournament(tournament.id)
-                        showToast('Tournament deleted')
-                        setModal(null)
-                      }}
-                    >
-                      Delete Tournament
-                    </button>
+                  <div className="tournament-modal-card" style={{ borderTop: `4px solid ${accent}` }}>
+                    <div className="tournament-section-label">Hall of Records</div>
+                    <div className="tournament-fact-row"><span>Champion</span><strong>{champion?.label || 'TBD'}</strong></div>
+                    <div className="tournament-fact-row"><span>Scope</span><strong>{tournament.scope === 'show' ? tournament.scopeShow : 'Universe'}</strong></div>
+                    <div className="tournament-fact-row"><span>Match Class</span><strong>{getTournamentTypeLabel(tournament.matchType)}</strong></div>
                   </div>
-
-                  <div className="tournament-modal-card">
-                    <div className="tournament-section-label">Quick Facts</div>
-                    <div className="tournament-fact-row"><span>Winner</span><strong>{champion?.label || 'TBD'}</strong></div>
-                    <div className="tournament-fact-row"><span>Prize</span><strong>{titles.find((title) => title.id === tournament.prizeTitleId)?.name || 'None'}</strong></div>
-                    <div className="tournament-fact-row"><span>Created</span><strong>{formatUniverseDate(tournament.createdAt)}</strong></div>
-                    <div className="tournament-fact-row"><span>Status</span><strong>{tournament.status === 'complete' ? 'Complete' : 'Active'}</strong></div>
-                  </div>
+                  <button className="btn btn-danger" onClick={() => { if(confirm('Delete tournament?')) { deleteTournament(tournament.id); setModal(null); showToast('Bracket destroyed'); } }}>
+                    <FiTrash2 /> Retire Tournament
+                  </button>
                 </div>
               </div>
             </Modal>
@@ -650,43 +394,23 @@ export default function Tournaments({
         })()}
 
       {booking && (
-        <Modal title="Book Tournament Match" onClose={() => setBooking(null)}>
+        <Modal title="Schedule Bracket Match" onClose={() => setBooking(null)}>
           <div className="form-group">
-            <label>Calendar Date</label>
-            <select value={booking.date} onChange={(e) => setBooking((current) => ({ ...current, date: e.target.value }))}>
-              {bookingOptions.map((option) => (
-                <option key={option.date} value={option.date}>{getTournamentBookingOptionLabel(option)}</option>
-              ))}
+            <label>Available Date</label>
+            <select value={booking.date} onChange={e => setBooking(c => ({ ...c, date: e.target.value }))}>
+              {bookingOptions.map(o => <option key={o.date} value={o.date}>{getTournamentBookingOptionLabel(o)}</option>)}
             </select>
           </div>
-
-          {bookingOptions.length > 0 && (
-            <div className="form-group">
-              <label>Event Card</label>
-              <select value={booking.eventId || ''} onChange={(e) => setBooking((current) => ({ ...current, eventId: e.target.value }))}>
-                <option value="">Choose an event card</option>
-                {bookingEventOptions.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.kind === 'special' ? `${event.name} Event (${event.brandName})` : event.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {bookingOptions.length === 0 && (
-            <div className="tournament-helper-copy" style={{ marginBottom: 16 }}>
-              No eligible show dates were found yet for this tournament scope.
-            </div>
-          )}
-
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setBooking(null)}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-primary" onClick={handleConfirmBooking} disabled={bookingOptions.length === 0}>
-              Book Match
-            </button>
+          <div className="form-group">
+            <label>Event Card</label>
+            <select value={booking.eventId} onChange={e => setBooking(c => ({ ...c, eventId: e.target.value }))}>
+              <option value="">Select Event</option>
+              {bookingEventOptions.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+          <div className="form-actions" style={{ marginTop: 24 }}>
+            <button className="btn btn-secondary" onClick={() => setBooking(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleConfirmBooking}>Confirm Schedule</button>
           </div>
         </Modal>
       )}

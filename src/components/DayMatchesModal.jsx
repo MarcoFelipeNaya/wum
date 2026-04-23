@@ -1,9 +1,26 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import { DAY_NAMES, MONTHS } from '../utils/dates.js'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faStar as faStarSolid, faStarHalfStroke } from '@fortawesome/free-solid-svg-icons'
-import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons'
+import { 
+  FiStar, 
+  FiCheckCircle, 
+  FiZap, 
+  FiAward, 
+  FiCamera, 
+  FiMic, 
+  FiMessageSquare, 
+  FiUsers, 
+  FiShield, 
+  FiActivity, 
+  FiCopy, 
+  FiTrash2, 
+  FiEdit3, 
+  FiPlus, 
+  FiChevronUp, 
+  FiChevronDown, 
+  FiInfo
+} from 'react-icons/fi'
+import './DayMatchesModal.css'
 
 const ALLOWED_PARTICIPANT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
 const FINISH_TYPES = ['Clean Pinfall', 'Submission', 'DQ', 'Count Out', 'Interference', 'Roll-Up', 'Knockout', 'Ref Stoppage', 'No Contest']
@@ -220,36 +237,42 @@ function getDayCardItemKey(item) {
 
 function MatchRatingInput({ rating, disabled, onChange }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-      <div style={{ display: 'flex', gap: 6 }}>
+    <div className="item-rating-row">
+      <div className="star-rating">
         {Array.from({ length: 5 }).map((_, index) => {
           const starIndex = index + 1
+          const isActive = (rating || 0) >= starIndex
+          const isHalf = (rating || 0) >= starIndex - 0.5 && (rating || 0) < starIndex
+          
           return (
-            <div key={starIndex} style={{ position: 'relative', width: 22, height: 22 }}>
-              <FontAwesomeIcon
-                icon={getStarIconForRating(rating || 0, starIndex)}
-                style={{ color: '#d4af37', fontSize: 20, position: 'absolute', inset: 0 }}
+            <div key={starIndex} style={{ position: 'relative', width: 24, height: 24 }}>
+              <FiStar
+                className={`star-icon ${isActive || isHalf ? 'active' : ''}`}
+                style={{ 
+                  color: isActive || isHalf ? 'var(--gold)' : 'var(--text3)',
+                  opacity: isActive || isHalf ? 1 : 0.2
+                }}
               />
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(starIndex - 0.5)}
-                style={{ position: 'absolute', inset: '0 50% 0 0', border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer' }}
-                aria-label={`Rate ${starIndex - 0.5} out of 5`}
+                style={{ position: 'absolute', inset: '0 50% 0 0', border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer', zIndex: 2 }}
               />
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(starIndex)}
-                style={{ position: 'absolute', inset: '0 0 0 50%', border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer' }}
-                aria-label={`Rate ${starIndex} out of 5`}
+                style={{ position: 'absolute', inset: '0 0 0 50%', border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer', zIndex: 2 }}
               />
             </div>
           )
         })}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: 'var(--text2)' }}>{formatRatingValue(rating)} / 5</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 900, color: rating ? 'var(--gold)' : 'var(--text3)', letterSpacing: '0.5px' }}>
+          {rating ? `${rating.toFixed(1)} STARS` : 'UNRATED'}
+        </span>
         {!disabled && rating != null && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(null)}>
             Clear
@@ -290,10 +313,11 @@ function getStoryParticipantIds(story, teams, factions) {
   })
 }
 
-function SectionCard({ title, children }) {
+function SectionCard({ title, children, icon: Icon }) {
   return (
-    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 14 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 12 }}>
+    <div className="booking-section">
+      <div className="booking-section-header">
+        {Icon && <Icon style={{ marginRight: 10, fontSize: 16 }} />}
         {title}
       </div>
       {children}
@@ -341,6 +365,26 @@ export default function DayMatchesModal({
   const selectedEvent = dayEvents.find((event) => event.id === selectedEventId) || dayEvents[0] || null
   const showLabel = selectedEvent?.name || dayEvents.map((s) => s.name).join(' & ')
   const titleStr = `${DAY_NAMES[idx]}, ${MONTHS[modalMonthIndex]} ${modalDay}, ${modalYear}${showLabel ? ' - ' + showLabel : ''}`
+  const selectStyle = {
+    width: '100%',
+    background: 'var(--bg3)',
+    border: '1px solid var(--border2)',
+    color: 'var(--text)',
+    padding: '8px 10px',
+    borderRadius: 'var(--radius)',
+    fontSize: 13,
+    boxSizing: 'border-box',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+  }
+  const smallSelectStyle = {
+    ...selectStyle,
+    width: 'auto',
+    minWidth: 140,
+    padding: '7px 10px',
+    fontSize: 12,
+  }
 
   // Match booking state
   const [editingMatchId, setEditingMatchId] = useState(null)
@@ -614,18 +658,6 @@ export default function DayMatchesModal({
     resetEditSegmentForm()
   }
 
-  const selectStyle = {
-    flex: 1, minWidth: 100,
-    background: 'var(--bg3)', border: '1px solid var(--border2)',
-    color: 'var(--text)', padding: '8px 10px',
-    borderRadius: 'var(--radius)', fontSize: 13,
-  }
-
-  const smallSelectStyle = {
-    background: 'var(--bg3)', border: '1px solid var(--border2)',
-    color: 'var(--text)', padding: '8px 10px',
-    borderRadius: 'var(--radius)', fontSize: 13, minWidth: 140,
-  }
 
   const canEditMatch = (match) => isCurrentDay && match.winnerId == null
 
@@ -844,7 +876,6 @@ export default function DayMatchesModal({
   const accentColor = specialEvent?.color || primaryBrand?.color || 'var(--gold)'
   const isCompactLayout = viewportWidth <= 1180
   const isPhoneLayout = viewportWidth <= 760
-  const modalGridColumns = isCurrentDay ? (isCompactLayout ? '1fr' : '1fr 1fr 1fr') : '1fr'
   const bookingTeamGridColumns = isPhoneLayout ? '1fr' : `repeat(${bookingLayout.teams.length}, minmax(0, 1fr))`
   const twoColumnOptionGrid = isPhoneLayout ? '1fr' : '1fr 1fr'
   const completedMatches = dayMatches.filter((match) => match.winnerId)
@@ -856,36 +887,42 @@ export default function DayMatchesModal({
   return (
     <Modal title={titleStr} onClose={onClose} style={{ maxWidth: isCurrentDay ? '1600px' : '800px', width: '100%' }}>
       {specialEvent && (
-        <div style={{
-          marginBottom: 14,
-          padding: '16px 18px',
-          borderRadius: 'var(--radius)',
-          border: `1px solid ${accentColor}55`,
-          background: `linear-gradient(135deg, ${accentColor}22, rgba(10, 10, 16, 0.92))`,
-          boxShadow: `inset 0 1px 0 ${accentColor}22`,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 11, color: accentColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>Special Event</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, lineHeight: 1, marginTop: 6 }}>{specialEvent.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 8 }}>{specialEvent.brandName} presentation</div>
-            </div>
-            <div style={{ display: 'grid', gap: 6, minWidth: 180 }}>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Booked Matches: <strong style={{ color: 'var(--text)' }}>{dayMatches.length}</strong></div>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Booked Segments: <strong style={{ color: 'var(--text)' }}>{daySegments.length}</strong></div>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Title Matches: <strong style={{ color: 'var(--text)' }}>{titleChanges.length}</strong></div>
+        <div className="booking-hero">
+          <div className="booking-hero-content">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div>
+                <div className="electric-text" style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 2 }}>
+                  <FiZap style={{ marginRight: 8 }} />
+                  Special Event
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900, lineHeight: 1, marginTop: 8, color: 'var(--text)' }}>{specialEvent.name}</div>
+                <div style={{ fontSize: 14, color: 'var(--text3)', marginTop: 12, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>{specialEvent.brandName} presentation</div>
+              </div>
+              <div style={{ display: 'grid', gap: 10, minWidth: 200, padding: '12px 20px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Booked Matches: <strong className="electric-text">{dayMatches.length}</strong></div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Booked Segments: <strong style={{ color: 'var(--purple)' }}>{daySegments.length}</strong></div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Title Matches: <strong style={{ color: 'var(--gold)' }}>{titleChanges.length}</strong></div>
+              </div>
             </div>
           </div>
         </div>
       )}
       {isCurrentDay && !allDone && (
-        <div className="modal-banner banner-live">Current show - book matches and set all winners to advance</div>
+        <div className="booking-banner banner-live">
+          <FiZap className="electric-text" />
+          Tonight&apos;s Show is LIVE — Book the card and set winners to advance
+        </div>
       )}
       {isCurrentDay && allDone && (
-        <div className="modal-banner banner-ready">All matches complete - click "Advance Show" to move forward</div>
+        <div className="booking-banner banner-ready">
+          <FiCheckCircle />
+          The Card is Complete — You are ready to advance the show
+        </div>
       )}
       {!isCurrentDay && (
-        <div className="modal-banner banner-past">Past show - view only</div>
+        <div className="booking-banner banner-past">
+          Historical Event Record
+        </div>
       )}
       {dayEvents.length > 1 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
@@ -932,17 +969,11 @@ export default function DayMatchesModal({
         </div>
       )}
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: modalGridColumns,
-        gap: 16,
-        alignItems: 'start',
-      }}>
+      <div className={`booking-modal-shell${!isCurrentDay ? ' booking-modal-shell--history' : ''}`}>
 
-        {/* ── COLUMN 1: Book Match ── */}
         {isCurrentDay && (
-          <div>
-            <SectionCard title="Book Match">
+          <div className="booking-modal-column booking-modal-column--left">
+            <SectionCard title="Book Match" icon={FiAward}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Wrestlers Filter</label>
@@ -987,7 +1018,7 @@ export default function DayMatchesModal({
                 {!bookingLayout.isTeamBased && (
                   <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
                     {Array.from({ length: participantCount }).map((_, i) => (
-                      <select key={i} name={`participant_${i}`} defaultValue="" style={{ ...selectStyle, width: '100%' }}>
+                      <select key={i} name={`participant_${i}`} defaultValue="" style={selectStyle}>
                         <option value="">Participant {i + 1}</option>
                         {bookingWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                       </select>
@@ -1002,7 +1033,7 @@ export default function DayMatchesModal({
                         {bookingEligibleTeams.length > 0 && (
                           <div style={{ marginBottom: 8 }}>
                             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                            <select name={`team${teamIndex}_saved`} defaultValue="" style={{ ...selectStyle, width: '100%' }}>
+                            <select name={`team${teamIndex}_saved`} defaultValue="" style={selectStyle}>
                               <option value="">Manual selection</option>
                               {bookingEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
                             </select>
@@ -1011,7 +1042,7 @@ export default function DayMatchesModal({
                         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
                         <div style={{ display: 'grid', gap: 8 }}>
                           {Array.from({ length: team.size }).map((_, i) => (
-                            <select key={i} name={`team${teamIndex}_${i}`} defaultValue="" style={{ ...selectStyle, width: '100%' }}>
+                            <select key={i} name={`team${teamIndex}_${i}`} defaultValue="" style={selectStyle}>
                               <option value="">Select wrestler</option>
                               {bookingWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </select>
@@ -1024,12 +1055,12 @@ export default function DayMatchesModal({
 
                 <div className="form-group">
                   <label>Stipulation (optional)</label>
-                  <input name="stipulation" defaultValue="" placeholder="e.g. Casket Match, No DQ, Iron Man" style={{ ...selectStyle, width: '100%' }} />
+                  <input name="stipulation" defaultValue="" placeholder="e.g. Casket Match, No DQ, Iron Man"  />
                 </div>
 
                 <div className="form-group">
                   <label>Title on the line (optional)</label>
-                  <select name="titleId" defaultValue="" style={{ ...selectStyle, flex: 'unset', width: '100%' }}>
+                  <select name="titleId" defaultValue="" style={selectStyle}>
                     <option value="">- No title match -</option>
                     {bookingTitles.map((t) => {
                       const champNames = getChampIds(t).map((id) => getW(id)?.name).filter(Boolean)
@@ -1040,7 +1071,7 @@ export default function DayMatchesModal({
 
                 <div className="form-group">
                   <label>Story Link (optional)</label>
-                  <select name="storyId" defaultValue="auto" style={{ ...selectStyle, width: '100%' }}>
+                  <select name="storyId" defaultValue="auto" style={selectStyle}>
                     <option value="">- No linked story -</option>
                     <option value="auto">Auto-detect from participants</option>
                     {activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}
@@ -1049,7 +1080,7 @@ export default function DayMatchesModal({
 
                 <div className="form-group">
                   <label>Match Notes</label>
-                  <textarea name="notes" defaultValue="" placeholder="What happened in the match?" rows={5} style={{ ...selectStyle, width: '100%', resize: 'vertical' }} />
+                  <textarea name="notes" defaultValue="" placeholder="What happened in the match?" rows={5}  />
                 </div>
 
                 <div className="form-actions">
@@ -1061,12 +1092,12 @@ export default function DayMatchesModal({
           </div>
         )}
 
-        {/* ── COLUMN 2: Show Card (matches + segments for this day) ── */}
-        <div>
-          <SectionCard title={isCurrentDay ? 'Match Card' : 'Show Card'}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        {/* ── COLUMN 2: Show Card ── */}
+        <div className="booking-modal-column booking-modal-column--center">
+          <SectionCard title={isCurrentDay ? "Tonight's Card" : "Show Card"} icon={FiZap}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
               <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopyDayCardText}>
-                Copy Event Card
+                <FiCopy style={{ marginRight: 6 }} /> Copy Event Card
               </button>
             </div>
             {dayCardItems.length === 0 && (
@@ -1096,34 +1127,33 @@ export default function DayMatchesModal({
                         onDragEnd={clearDragState}
                         onDragOver={(e) => handleDragOver(e, item)}
                         onDrop={() => handleDrop(item)}
+                        className="show-card-item segment"
                         style={{
-                        padding: '10px 12px', background: 'var(--bg3)',
-                        border: '1px solid var(--border2)', borderLeft: '3px solid #9b59b6',
-                        borderRadius: 'var(--radius)',
-                        opacity: draggedItem && dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 0.92 : 1,
-                        boxShadow: dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? '0 0 0 2px rgba(212, 175, 55, 0.2)' : 'none',
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 10 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span className="match-num">Segment {i + 1}</span>
+                          opacity: draggedItem && dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 0.92 : 1,
+                          boxShadow: dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 'var(--glow-heat)' : 'none',
+                        }}
+                      >
+                        <div className="item-badge-row">
+                          <div className="item-badges">
+                            <span className="badge badge-purple">SEGMENT {i + 1}</span>
                             {seg.segmentType && (
-                              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: typeColor + '22', color: typeColor, border: `1px solid ${typeColor}44` }}>
+                              <span className="badge badge-dim">
                                 {seg.segmentType}
                               </span>
                             )}
-                            {seg.storyName && <span style={{ fontSize: 10, color: 'var(--text2)' }}>→ {seg.storyName}</span>}
+                            {seg.storyName && <span className="badge badge-dim">{seg.storyName}</span>}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            {isCurrentDay && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Drag</span>}
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}>Up</button>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}>Down</button>
+                          <div className="item-actions">
+                            {isCurrentDay && <FiActivity style={{ fontSize: 14, color: 'var(--text3)', marginRight: 4 }} title="Drag to reorder" />}
+                            <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}><FiChevronUp /></button>
+                            <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
                             {isCurrentDay && onUpdateSegment && (
-                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => startEditingSegment(seg)}>
-                                Edit
+                              <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => startEditingSegment(seg)}>
+                                <FiEdit3 />
                               </button>
                             )}
                             {isCurrentDay && onDeleteSegment && (
-                              <button type="button" className="btn btn-danger btn-sm" onClick={() => onDeleteSegment(seg.storyId, seg.segmentIndex, seg.id)}>Delete</button>
+                              <button type="button" className="btn btn-icon btn-danger btn-sm" onClick={() => onDeleteSegment(seg.storyId, seg.segmentIndex, seg.id)}><FiTrash2 /></button>
                             )}
                           </div>
                         </div>
@@ -1146,12 +1176,12 @@ export default function DayMatchesModal({
                           <div style={{ marginTop: 10, display: 'grid', gap: 12 }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>
                               <label>Segment Title</label>
-                              <input value={editSegTitle} onChange={(e) => setEditSegTitle(e.target.value)} placeholder="Segment title" style={{ ...selectStyle, width: '100%' }} />
+                              <input value={editSegTitle} onChange={(e) => setEditSegTitle(e.target.value)} placeholder="Segment title"  />
                             </div>
 
                             <div className="form-group" style={{ marginBottom: 0 }}>
                               <label>Segment Description</label>
-                              <textarea value={editSegDescription} onChange={(e) => setEditSegDescription(e.target.value.slice(0, 3000))} rows={5} style={{ ...selectStyle, width: '100%', resize: 'vertical' }} />
+                              <textarea value={editSegDescription} onChange={(e) => setEditSegDescription(e.target.value.slice(0, 3000))} rows={5}  />
                             </div>
 
                             <div>
@@ -1200,25 +1230,24 @@ export default function DayMatchesModal({
                                 <option value="current">Current Show</option>
                                 {availableShowOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                               </select>
-                              <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', background: 'var(--bg2)' }}>
-                                {editSegmentWrestlers.length === 0 && (
+                              <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', background: 'var(--bg2)' }}>
+                                {editSegmentWrestlers.length === 0 ? (
                                   <div style={{ padding: 12, fontSize: 12, color: 'var(--text2)', textAlign: 'center' }}>No wrestlers found</div>
+                                ) : (
+                                  editSegmentWrestlers.map((w) => (
+                                    <label key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
+                                      <input type="checkbox" checked={editSegSelectedWrestlers.includes(w.id)} onChange={() => toggleEditSegWrestler(w.id)} style={{ accentColor: 'var(--red, #c0392b)', cursor: 'pointer' }} />
+                                      <span style={{ fontSize: 13, color: 'var(--text)' }}>{w.name}</span>
+                                      {w.show && <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 'auto' }}>{w.show}</span>}
+                                    </label>
+                                  ))
                                 )}
-                                {editSegmentWrestlers.map((w) => (
-                                  <label key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', background: editSegSelectedWrestlers.includes(w.id) ? 'rgba(192,57,43,0.08)' : 'transparent' }}>
-                                    <input type="checkbox" checked={editSegSelectedWrestlers.includes(w.id)} onChange={() => toggleEditSegWrestler(w.id)} style={{ accentColor: 'var(--red, #c0392b)', cursor: 'pointer' }} />
-                                    <span style={{ fontSize: 13, color: 'var(--text)' }}>{w.name}</span>
-                                    {w.show && <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 'auto' }}>{w.show}</span>}
-                                  </label>
-                                ))}
                               </div>
                             </div>
 
-                            <div className="form-actions" style={{ marginTop: 0 }}>
+                            <div className="form-actions">
                               <button type="button" className="btn btn-secondary" onClick={resetEditSegmentForm}>Cancel</button>
-                              <button type="button" className="btn btn-primary" onClick={() => handleSaveSegmentEdit(seg)} disabled={!editSegTitle.trim()}>
-                                Save Segment
-                              </button>
+                              <button type="button" className="btn btn-primary" onClick={saveEditedSegment} disabled={!editSegTitle.trim()}>Save Segment</button>
                             </div>
                           </div>
                         )}
@@ -1228,21 +1257,12 @@ export default function DayMatchesModal({
 
                   const m = item.match
                   const participantIds = getParticipantIdsFromMatch(m)
-                  const participants = participantIds.map(getW).filter(Boolean)
+                  const participants = participantIds.map((id) => getW(id)).filter(Boolean)
                   const teams = getTeamsFromMatch(m)
-                  const titleMatch = m.titleId ? getT(m.titleId) : null
-                  const linkedStory = m.storyId ? getStory(m.storyId) : null
+                  const titleMatch = titles.find((t) => t.id === m.titleId)
                   const isEditingThisMatch = editingMatchId === m.id
-                  const editWrestlers = getAvailableWrestlers(participantIds)
-                  const editTitles = getAvailableTitles(editParticipantCount, editMatchMode, m.titleId)
-                  const editLayout = getTeamLayout(editParticipantCount, editMatchMode)
-                  const editEligibleTeams = getEligibleTeams(editLayout)
-                  const hasNotes = !!m.notes?.trim()
-                  const isNotesExpanded = expandedNotesId === m.id
                   return (
-                    <div
-                      key={`match-${m.id}`}
-                      className="match-card"
+                    <div key={m.id}
                       ref={(node) => {
                         const key = getDayCardItemKey(item)
                         if (node) dayCardRefs.current.set(key, node)
@@ -1253,21 +1273,24 @@ export default function DayMatchesModal({
                       onDragEnd={clearDragState}
                       onDragOver={(e) => handleDragOver(e, item)}
                       onDrop={() => handleDrop(item)}
-                      style={dragOverKey === `${item.kind}:${item.id}` ? { boxShadow: '0 0 0 2px rgba(212, 175, 55, 0.2)' } : undefined}
+                      className="show-card-item match"
+                      style={{
+                        opacity: draggedItem && dragOverKey === `${item.kind}:${item.id}` ? 0.92 : 1,
+                        boxShadow: dragOverKey === `${item.kind}:${item.id}` ? 'var(--glow-heat)' : 'none',
+                      }}
                     >
-                      <div className="match-header-row">
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span className="match-num">Match {i + 1} - {m.matchType || getMatchTypeLabel(participantIds.length, m.mode)}</span>
-                          {i === 0 && <span className="badge badge-gold" style={{ fontSize: 10 }}>Main Event</span>}
-                          {m.stipulation && <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.stipulation}</span>}
-                          {m.finishType && <span className="badge" style={{ fontSize: 10, background: 'rgba(41, 128, 185, 0.18)', color: '#6cb7ff', border: '1px solid rgba(41, 128, 185, 0.35)' }}>{m.finishType}</span>}
-                          {linkedStory && <span className="badge" style={{ fontSize: 10, background: 'rgba(155, 89, 182, 0.18)', color: '#d8a8ff', border: '1px solid rgba(155, 89, 182, 0.35)' }}>{linkedStory.name}</span>}
+                      <div className="item-badge-row">
+                        <div className="item-badges">
+                          <span className="badge badge-primary">MATCH {i + 1}</span>
+                          <span className="badge badge-dim">{m.matchType || getMatchTypeLabel(participantIds.length, m.mode)}</span>
+                          {i === 0 && <span className="badge badge-gold"><FiAward style={{ marginRight: 4 }} /> Main Event</span>}
+                          {m.stipulation && <span className="badge badge-red">{m.stipulation}</span>}
+                          {titleMatch && <span className="badge badge-gold"><FiAward style={{ marginRight: 4 }} /> {titleMatch.name}</span>}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                          {isCurrentDay && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Drag</span>}
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}>Up</button>
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}>Down</button>
-                          {titleMatch && <span className="badge badge-gold" style={{ fontSize: 10 }}>[B] {titleMatch.name.split(' ')[0]} Title</span>}
+                        <div className="item-actions">
+                          {isCurrentDay && <FiActivity style={{ fontSize: 14, color: 'var(--text3)', marginRight: 4 }} title="Drag to reorder" />}
+                          <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}><FiChevronUp /></button>
+                          <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
                         </div>
                       </div>
                       {!isEditingThisMatch && (
@@ -1280,7 +1303,7 @@ export default function DayMatchesModal({
                                   <select
                                     value={winnerFinishTypes[m.id] || ''}
                                     onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
-                                    style={{ ...selectStyle, width: '100%' }}
+                                    style={selectStyle}
                                   >
                                     <option value="">- Required to set winner -</option>
                                     {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
@@ -1302,7 +1325,7 @@ export default function DayMatchesModal({
                                   <select
                                     value={winnerFinishTypes[m.id] || ''}
                                     onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
-                                    style={{ ...selectStyle, width: '100%' }}
+                                    style={selectStyle}
                                   >
                                     <option value="">- Required to set winner -</option>
                                     {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
@@ -1313,10 +1336,19 @@ export default function DayMatchesModal({
                               {teams.map((teamIds, teamIndex) => (
                                 <div key={`team-${teamIndex}`}>
                                   <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team {String.fromCharCode(65 + teamIndex)}</div>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                  <div className="item-participants">
                                     {teamIds.map((id) => {
                                       const w = getW(id); if (!w) return null
-                                      return <button key={id} className={`winner-btn${m.winnerId === id ? ' selected' : ''}`} onClick={() => isCurrentDay && handleWinnerSelect(m.id, id)} disabled={!isCurrentDay}>{w.name}</button>
+                                      return (
+                                        <button 
+                                          key={id} 
+                                          className={`winner-button ${m.winnerId === id ? 'selected' : ''}`} 
+                                          onClick={() => isCurrentDay && handleWinnerSelect(m.id, id)} 
+                                          disabled={!isCurrentDay}
+                                        >
+                                          {w.name}
+                                        </button>
+                                      )
                                     })}
                                   </div>
                                 </div>
@@ -1325,181 +1357,21 @@ export default function DayMatchesModal({
                             </div>
                           )}
                           {m.winnerId && <div className="match-winner-label">Winner: {getWinnerNamesFromMatch(m, getW).join(' / ')}{m.finishType ? ` • ${m.finishType}` : ''}</div>}
-                          <MatchRatingInput
-                            rating={m.rating ?? null}
-                            disabled={!isCurrentDay || !m.winnerId || !onSetMatchRating}
-                            onChange={(rating) => onSetMatchRating?.(m.id, rating)}
-                          />
-                          {hasNotes && (
-                            <div style={{ marginTop: 8 }}>
-                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExpandedNotesId(isNotesExpanded ? null : m.id)}>
-                                {isNotesExpanded ? 'Hide Notes' : 'Show Notes'}
+
+                          <div className="item-rating-row">
+                            <MatchRatingInput
+                              rating={m.rating ?? null}
+                              disabled={!isCurrentDay}
+                              onChange={(value) => onSetMatchRating?.(m.id, value)}
+                            />
+                          </div>
+
+                          {m.notes && (
+                            <div className="item-notes" style={{ marginTop: 14 }}>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExpandedNotesId(expandedNotesId === m.id ? null : m.id)}>
+                                {expandedNotesId === m.id ? 'Hide Notes' : 'Show Notes'}
                               </button>
-                              {isNotesExpanded && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', padding: 10, border: '1px solid var(--border2)', borderRadius: 'var(--radius)', background: 'var(--bg2)' }}>{m.notes}</div>}
-                            </div>
-                          )}
-                          {canEditMatch(m) && (
-                            <div className="form-actions" style={{ marginTop: 10 }}>
-                              <button type="button" className="btn btn-secondary" onClick={() => startEditingMatch(m)}>Edit Match</button>
-                              <button type="button" className="btn btn-danger" onClick={() => onDeleteMatch(m.id)}>Delete Match</button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {isEditingThisMatch && (
-                        <form onSubmit={(e) => handleUpdateSubmit(e, m)} style={{ marginTop: 12 }}>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Participants</label>
-                              <select name="participantCount" value={editParticipantCount} onChange={(e) => setEditParticipantCount(parseInt(e.target.value, 10))} style={smallSelectStyle}>
-                                {ALLOWED_PARTICIPANT_COUNTS.map((c) => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                            </div>
-                            {getAllowedModes(editParticipantCount).length > 1 && (
-                              <div>
-                                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Match Style</label>
-                                <select name="mode" value={editMatchMode} onChange={(e) => setEditMatchMode(e.target.value)} style={smallSelectStyle}>
-                                  {getAllowedModes(editParticipantCount).map((m2) => <option key={m2} value={m2}>{getMatchTypeLabel(editParticipantCount, m2)}</option>)}
-                                </select>
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-                            Match Type: <strong>{getMatchTypeLabel(editParticipantCount, editMatchMode)}</strong>
-                          </div>
-                          {!editLayout.isTeamBased && (
-                            <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
-                              {Array.from({ length: editParticipantCount }).map((_, index) => (
-                                <select key={index} name={`participant_${index}`} defaultValue={getParticipantIdsFromMatch(m)[index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
-                                  <option value="">Participant {index + 1}</option>
-                                  {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                </select>
-                              ))}
-                            </div>
-                          )}
-                          {editLayout.isTeamBased && (
-                            <div style={{ display: 'grid', gridTemplateColumns: isPhoneLayout ? '1fr' : `repeat(${editLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
-                              {(() => {
-                                let participantOffset = 0
-                                return editLayout.teams.map((team, teamIndex) => {
-                                  const teamStart = participantOffset
-                                  participantOffset += team.size
-                                  return (
-                                    <div key={team.label}>
-                                      {editEligibleTeams.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div><select name={`team${teamIndex}_saved`} defaultValue="" style={{ ...selectStyle, width: '100%' }}><option value="">Manual selection</option>{editEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}</select></div>}
-                                      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
-                                      <div style={{ display: 'grid', gap: 8 }}>
-                                        {Array.from({ length: team.size }).map((_, index) => (
-                                          <select key={index} name={`team${teamIndex}_${index}`} defaultValue={getParticipantIdsFromMatch(m)[teamStart + index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
-                                            <option value="">Select wrestler</option>
-                                            {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                          </select>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )
-                                })
-                              })()}
-                            </div>
-                          )}
-                          <div className="form-group"><label>Stipulation (optional)</label><input name="stipulation" defaultValue={m.stipulation || ''} placeholder="e.g. Casket Match, No DQ, Iron Man" style={{ ...selectStyle, width: '100%' }} /></div>
-                          <div className="form-group"><label>Title on the line (optional)</label><select name="titleId" defaultValue={m.titleId ?? ''} style={{ ...selectStyle, flex: 'unset', width: '100%' }}><option value="">- No title match -</option>{editTitles.map((t) => { const champNames = getChampIds(t).map((id) => getW(id)?.name).filter(Boolean); return <option key={t.id} value={t.id}>{t.name} [{getTitleType(t)}] {champNames.length > 0 ? `(C: ${champNames.join(' / ')})` : '(Vacant)'}</option> })}</select></div>
-                          <div className="form-group"><label>Story Link (optional)</label><select name="storyId" defaultValue={m.storyId ?? 'auto'} style={{ ...selectStyle, width: '100%' }}><option value="">- No linked story -</option><option value="auto">Auto-detect from participants</option>{activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}</select></div>
-                          <div className="form-group"><label>Match Notes</label><textarea name="notes" defaultValue={m.notes || ''} placeholder="What happened in the match?" rows={4} style={{ ...selectStyle, width: '100%', resize: 'vertical' }} /></div>
-                          <div className="form-actions">
-                            <button type="button" className="btn btn-secondary" onClick={() => setEditingMatchId(null)}>Cancel</button>
-                            <button type="submit" className="btn btn-primary">Save Match</button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Matches */}
-            {false && orderedMatches.length > 0 && (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {orderedMatches.map((m, i) => {
-                  const participantIds = getParticipantIdsFromMatch(m)
-                  const participants = participantIds.map(getW).filter(Boolean)
-                  const teams = getTeamsFromMatch(m)
-                  const titleMatch = m.titleId ? getT(m.titleId) : null
-                  const isEditingThisMatch = editingMatchId === m.id
-                  const editWrestlers = getAvailableWrestlers(participantIds)
-                  const editTitles = getAvailableTitles(editParticipantCount, editMatchMode, m.titleId)
-                  const editLayout = getTeamLayout(editParticipantCount, editMatchMode)
-                  const editEligibleTeams = getEligibleTeams(editLayout)
-                  const teamAIds = teams ? teams[0] : []
-                  const teamBIds = teams ? teams[1] : []
-                  const isMainEvent = i === 0
-                  const hasNotes = !!m.notes?.trim()
-                  const isNotesExpanded = expandedNotesId === m.id
-
-                  return (
-                    <div key={m.id} className="match-card">
-                      <div className="match-header-row">
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span className="match-num">Match {i + 1} - {m.matchType || getMatchTypeLabel(participantIds.length, m.mode)}</span>
-                          {isMainEvent && <span className="badge badge-gold" style={{ fontSize: 10 }}>Main Event</span>}
-                          {m.stipulation && <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.stipulation}</span>}
-                        </div>
-                        {titleMatch && <span className="badge badge-gold" style={{ fontSize: 10 }}>[B] {titleMatch.name.split(' ')[0]} Title</span>}
-                      </div>
-
-                      {!isEditingThisMatch && (
-                        <>
-                          {!teams && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                              {participants.map((w) => (
-                                <button key={w.id} className={`winner-btn${m.winnerId === w.id ? ' selected' : ''}`}
-                                  onClick={() => isCurrentDay && onSetWinner(m.id, w.id)} disabled={!isCurrentDay}>
-                                  {w.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          {teams && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, marginTop: 10, alignItems: 'start' }}>
-                              <div>
-                                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team A</div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                  {teamAIds.map((id) => {
-                                    const w = getW(id); if (!w) return null
-                                    return <button key={id} className={`winner-btn${m.winnerId === id ? ' selected' : ''}`}
-                                      onClick={() => isCurrentDay && onSetWinner(m.id, id)} disabled={!isCurrentDay}>{w.name}</button>
-                                  })}
-                                </div>
-                              </div>
-                              <div style={{ alignSelf: 'center', fontWeight: 700, color: 'var(--text3)' }}>VS</div>
-                              <div>
-                                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team B</div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                  {teamBIds.map((id) => {
-                                    const w = getW(id); if (!w) return null
-                                    return <button key={id} className={`winner-btn${m.winnerId === id ? ' selected' : ''}`}
-                                      onClick={() => isCurrentDay && onSetWinner(m.id, id)} disabled={!isCurrentDay}>{w.name}</button>
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {m.winnerId && <div className="match-winner-label">Winner: {getW(m.winnerId)?.name}</div>}
-
-                          {hasNotes && (
-                            <div style={{ marginTop: 8 }}>
-                              <button type="button" className="btn btn-secondary btn-sm"
-                                onClick={() => setExpandedNotesId(isNotesExpanded ? null : m.id)}>
-                                {isNotesExpanded ? 'Hide Notes' : 'Show Notes'}
-                              </button>
-                              {isNotesExpanded && (
-                                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', padding: 10, border: '1px solid var(--border2)', borderRadius: 'var(--radius)', background: 'var(--bg2)' }}>
-                                  {m.notes}
-                                </div>
-                              )}
+                              {expandedNotesId === m.id && <p style={{ marginTop: 10, color: 'var(--text2)', lineHeight: 1.6 }}>{m.notes}</p>}
                             </div>
                           )}
 
@@ -1670,10 +1542,9 @@ export default function DayMatchesModal({
           </SectionCard>
         </div>
 
-        {/* ── COLUMN 3: Book Segment ── */}
         {isCurrentDay && (
-          <div>
-            <SectionCard title="Book Segment">
+          <div className="booking-modal-column booking-modal-column--right">
+            <SectionCard title="Book Segment" icon={FiMic}>
               <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 0, marginBottom: 14 }}>
                 Book a promo, interview, or other non-match segment.
               </p>
@@ -1789,6 +1660,8 @@ export default function DayMatchesModal({
             </SectionCard>
           </div>
         )}
+
+        
       </div>
     </Modal>
   )

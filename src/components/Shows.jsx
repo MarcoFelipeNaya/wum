@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
 import { MONTHS_FULL } from '../utils/dates.js'
+import { FiTv, FiStar, FiCalendar, FiUsers, FiAward, FiEdit3, FiTrash2, FiPlus, FiChevronRight, FiActivity } from 'react-icons/fi'
 import './Shows.css'
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -23,7 +24,7 @@ function formatSpecialSchedule(specialShow) {
     const [year, month, day] = String(specialShow.oneOffDate || '').split('-')
     return `${MONTHS_FULL[Math.max(0, Number(month) - 1)]} ${Number(day)}, ${year}`
   }
-  return `Every ${MONTHS_FULL[specialShow.month - 1]} ${specialShow.day} from ${specialShow.startYear}`
+  return `Every ${MONTHS_FULL[specialShow.month - 1]} Day ${specialShow.day} (since ${specialShow.startYear})`
 }
 
 export default function Shows({
@@ -65,9 +66,7 @@ export default function Shows({
       )
     )
     const brandSpecialShows = specialShows.filter((specialShow) => specialShow.showId === show.id)
-    const annualEvents = brandSpecialShows.filter((specialShow) => specialShow.type === 'annual')
-    const oneOffEvents = brandSpecialShows.filter((specialShow) => specialShow.type === 'one_off')
-
+    
     return {
       roster,
       brandTitles,
@@ -76,8 +75,6 @@ export default function Shows({
       completedMatches,
       relatedStories,
       brandSpecialShows,
-      annualEvents,
-      oneOffEvents,
     }
   }
 
@@ -166,43 +163,35 @@ export default function Shows({
       <div className="show-compact-card" onClick={() => setModal({ type: 'detail', id: show.id })}>
         <div className="show-card-accent" style={{ background: `linear-gradient(90deg, ${show.color}, transparent)` }} />
 
-        <div className="show-card-header">
-          <div className="show-card-header-main">
-            <div className="show-card-badges">
-              <span className="show-card-badge" style={{ background: `${show.color}22`, color: show.color, borderColor: `${show.color}44` }}>
-                {show.day}
-              </span>
-              <span className="show-card-badge show-card-badge-muted">Brand</span>
-            </div>
-            <h3 className="show-card-name" style={{ color: show.color }}>{show.name}</h3>
-          </div>
+        <div className="show-card-badges">
+          <span className="show-card-badge" style={{ background: `${show.color}22`, color: show.color, borderColor: `${show.color}44` }}>
+            {show.day}
+          </span>
+          <span className="show-card-badge" style={{ background: 'var(--bg3)', color: 'var(--text3)', borderColor: 'var(--border2)' }}>Brand</span>
         </div>
 
-        <div className="show-card-summary">
-          <div className="show-card-section-label">At A Glance</div>
-          <div className="show-card-subtle">
-            {stats.roster.length} wrestlers, {stats.brandTitles.length} title{stats.brandTitles.length !== 1 ? 's' : ''}, {stats.brandSpecialShows.length} special event{stats.brandSpecialShows.length !== 1 ? 's' : ''}
-          </div>
-        </div>
+        <h3 className="show-card-name" style={{ color: show.color }}>{show.name}</h3>
 
         <div className="show-card-highlights">
-          <span className="badge" style={{ background: `${show.color}1f`, color: show.color, border: `1px solid ${show.color}55`, boxShadow: 'none' }}>
-            Roster: {stats.roster.length}
+          <span className="badge" style={{ background: `${show.color}15`, color: show.color, border: `1px solid ${show.color}33`, boxShadow: 'none' }}>
+            <FiUsers style={{ marginRight: 4 }} /> {stats.roster.length} Talent
           </span>
-          <span className="badge badge-gray">Titles: {stats.brandTitles.length}</span>
-          <span className="badge badge-gray">Events: {stats.brandSpecialShows.length}</span>
+          <span className="badge badge-gray"><FiAward style={{ marginRight: 4 }} /> {stats.brandTitles.length} Titles</span>
+          <span className="badge badge-gray"><FiStar style={{ marginRight: 4 }} /> {stats.brandSpecialShows.length} Specials</span>
         </div>
 
         <div className="show-card-footer">
-          <div>
+          <div className="show-card-stat-group">
             <div className="show-card-stat">{stats.completedMatches.length}</div>
-            <div className="show-card-stat-label">Completed</div>
+            <div className="show-card-stat-label">Matches</div>
           </div>
-          <div>
+          <div className="show-card-stat-group">
             <div className="show-card-stat">{stats.crownedTitles.length}</div>
-            <div className="show-card-stat-label">Champions</div>
+            <div className="show-card-stat-label">Champs</div>
           </div>
-          <div className="show-card-open" style={{ color: show.color }}>View Details</div>
+          <div className="show-card-open" style={{ color: show.color }}>
+            Details <FiChevronRight />
+          </div>
         </div>
       </div>
     )
@@ -213,14 +202,15 @@ export default function Shows({
       <div className="page-header">
         <h1 className="page-title">Shows & Brands</h1>
         <button className="btn btn-primary" onClick={() => setModal('add')}>
-          + Add Show
+          <FiPlus /> New Brand
         </button>
       </div>
 
       <div className="shows-compact-grid">
         {shows.length === 0 && (
-          <div className="empty-state card" style={{ gridColumn: '1 / -1' }}>
-            <p>No shows yet. Create your first brand!</p>
+          <div className="empty-state card" style={{ gridColumn: '1 / -1', padding: '60px 0' }}>
+            <FiTv style={{ fontSize: 48, opacity: 0.1, marginBottom: 16 }} />
+            <p>No brands established. Start your legacy by creating a show.</p>
           </div>
         )}
         {shows.map((show) => (
@@ -235,73 +225,54 @@ export default function Shows({
           const stats = statsByShowId[show.id]
 
           return (
-            <Modal title={show.name} onClose={closeModal} style={{ maxWidth: '980px' }}>
+            <Modal title={show.name} onClose={closeModal} style={{ maxWidth: '1000px' }}>
               <div className="show-detail-shell">
                 <div className="show-detail-main">
-                  <div className="show-detail-meta-row">
-                    <span className="show-card-badge" style={{ background: `${show.color}22`, color: show.color, borderColor: `${show.color}44` }}>
-                      {show.day}
-                    </span>
-                    <span className="show-card-badge show-card-badge-muted">Brand</span>
-                  </div>
-
-                  <div className="show-detail-current">
-                    <div className="show-detail-heading">Show Snapshot</div>
-                    <div className="show-detail-brand" style={{ color: show.color }}>{show.name}</div>
-                    <div className="show-detail-subtle">
-                      Runs every {show.day} with {stats.roster.length} assigned wrestlers, {stats.brandTitles.length} brand title{stats.brandTitles.length !== 1 ? 's' : ''}, and {stats.brandSpecialShows.length} special event{stats.brandSpecialShows.length !== 1 ? 's' : ''}.
-                    </div>
-                  </div>
-
                   <div className="show-detail-stats-grid">
                     {[
-                      { label: 'Roster Size', value: stats.roster.length },
-                      { label: 'Brand Titles', value: stats.brandTitles.length },
-                      { label: 'Crowned Champions', value: stats.crownedTitles.length },
-                      { label: 'Annual Specials', value: stats.annualEvents.length },
-                      { label: 'One-Off Specials', value: stats.oneOffEvents.length },
-                      { label: 'Related Stories', value: stats.relatedStories.length },
+                      { label: 'Roster Size', value: stats.roster.length, icon: <FiUsers /> },
+                      { label: 'Brand Titles', value: stats.brandTitles.length, icon: <FiAward /> },
+                      { label: 'Matches Run', value: stats.completedMatches.length, icon: <FiActivity /> },
+                      { label: 'Special Events', value: stats.brandSpecialShows.length, icon: <FiStar /> },
                     ].map((item) => (
                       <div key={item.label} className="show-detail-stat-card">
-                        <div className="show-detail-stat-value" style={{ color: show.color }}>{item.value}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div className="show-detail-stat-value" style={{ color: show.color }}>{item.value}</div>
+                          <div style={{ fontSize: 18, color: 'var(--text3)' }}>{item.icon}</div>
+                        </div>
                         <div className="show-detail-stat-label">{item.label}</div>
                       </div>
                     ))}
                   </div>
 
                   <div className="show-detail-section">
-                    <div className="show-detail-section-head">
-                      <div className="show-detail-heading">Special Events</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                      <div className="show-detail-heading" style={{ margin: 0 }}>Special Events & Pay-Per-Views</div>
                       <button className="btn btn-primary btn-sm" onClick={() => openSpecialModal(show)}>
-                        + Add Special Show
+                        <FiPlus /> Add Event
                       </button>
                     </div>
                     {stats.brandSpecialShows.length === 0 ? (
-                      <div className="show-detail-empty">No special events tied to this brand yet.</div>
+                      <div className="empty-state" style={{ padding: '20px 0' }}>No special events scheduled for this brand.</div>
                     ) : (
                       <div className="show-detail-list">
                         {stats.brandSpecialShows.map((specialShow) => (
                           <div key={specialShow.id} className="show-detail-list-row">
-                            <div>
-                              <div className="show-detail-list-title">{specialShow.name}</div>
-                              <div className="show-detail-list-subtle">{formatSpecialSchedule(specialShow)}</div>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                              <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: show.color, border: '1px solid var(--border2)' }}>
+                                <FiStar />
+                              </div>
+                              <div>
+                                <div className="show-detail-list-title">{specialShow.name}</div>
+                                <div className="show-detail-list-subtle"><FiCalendar style={{ marginRight: 4 }} /> {formatSpecialSchedule(specialShow)}</div>
+                              </div>
                             </div>
-                            <div className="show-detail-inline-actions">
-                              <span className="badge" style={{ background: `${show.color}1f`, color: show.color, border: `1px solid ${show.color}55`, boxShadow: 'none' }}>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <span className="badge" style={{ background: 'var(--bg2)', color: 'var(--text3)', border: '1px solid var(--border2)' }}>
                                 {specialShow.type === 'annual' ? 'Annual' : 'One-Off'}
                               </span>
-                              <button className="btn btn-secondary btn-sm" onClick={() => openSpecialModal(show, specialShow)}>
-                                Edit
-                              </button>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={() => {
-                                  deleteSpecialShow(specialShow.id)
-                                  showToast('Special show removed')
-                                }}
-                              >
-                                Delete
-                              </button>
+                              <button className="btn btn-icon btn-secondary btn-sm" onClick={() => openSpecialModal(show, specialShow)}><FiEdit3 /></button>
+                              <button className="btn btn-icon btn-danger btn-sm" onClick={() => { deleteSpecialShow(specialShow.id); showToast('Event removed') }}><FiTrash2 /></button>
                             </div>
                           </div>
                         ))}
@@ -310,22 +281,29 @@ export default function Shows({
                   </div>
 
                   <div className="show-detail-section">
-                    <div className="show-detail-heading">Championships</div>
+                    <div className="show-detail-heading">Active Championships</div>
                     {stats.brandTitles.length === 0 ? (
-                      <div className="show-detail-empty">No championships assigned to this show.</div>
+                      <div className="empty-state" style={{ padding: '20px 0' }}>No championships assigned to this brand.</div>
                     ) : (
                       <div className="show-detail-list">
                         {stats.brandTitles.map((title) => (
                           <div key={title.id} className="show-detail-list-row">
-                            <div>
-                              <div className="show-detail-list-title">{title.name}</div>
-                              <div className="show-detail-list-subtle">
-                                {getChampIds(title).length > 0
-                                  ? getChampIds(title).map((id) => getWrestler(id)?.name ?? 'Unknown').join(' / ')
-                                  : 'Vacant'}
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                              <div style={{ width: 40, height: 40, borderRadius: 20, background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold)', border: '1px solid var(--border2)' }}>
+                                <FiAward />
+                              </div>
+                              <div>
+                                <div className="show-detail-list-title">{title.name}</div>
+                                <div className="show-detail-list-subtle">
+                                  Champion: <strong style={{ color: 'var(--text)' }}>
+                                    {getChampIds(title).length > 0
+                                      ? getChampIds(title).map((id) => getWrestler(id)?.name ?? 'Unknown').join(' / ')
+                                      : 'Vacant'}
+                                  </strong>
+                                </div>
                               </div>
                             </div>
-                            <span className="badge" style={{ background: `${show.color}1f`, color: show.color, border: `1px solid ${show.color}55`, boxShadow: 'none' }}>
+                            <span className="badge" style={{ background: `${show.color}15`, color: show.color, border: `1px solid ${show.color}33` }}>
                               {title.type || 'singles'}
                             </span>
                           </div>
@@ -336,43 +314,39 @@ export default function Shows({
                 </div>
 
                 <div className="show-detail-side">
-                  <div className="show-side-card">
-                    <div className="show-detail-heading">Show Actions</div>
-                    <button className="btn btn-primary" onClick={() => openShowEdit(show)}>
-                      Edit Show
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => openSpecialModal(show)}>
-                      Add Special Show
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => {
-                        deleteShow(show.id)
-                        showToast('Show removed')
-                        closeModal()
-                      }}
-                    >
-                      Delete Show
-                    </button>
+                  <div className="show-side-card" style={{ borderTop: `4px solid ${show.color}` }}>
+                    <div className="show-detail-heading">Brand Management</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <button className="btn btn-secondary" onClick={() => openShowEdit(show)}>
+                        <FiEdit3 /> Edit Show Details
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete ${show.name}?`)) {
+                            deleteShow(show.id)
+                            showToast('Brand deleted')
+                            closeModal()
+                          }
+                        }}
+                      >
+                        <FiTrash2 /> Delete Brand
+                      </button>
+                    </div>
                   </div>
 
                   <div className="show-side-card">
-                    <div className="show-detail-heading">Quick Facts</div>
+                    <div className="show-detail-heading">Brand Logistics</div>
                     <div className="show-fact-row">
-                      <span>Weekly Day</span>
-                      <strong>{show.day}</strong>
+                      <span style={{ color: 'var(--text3)' }}>Weekly Day</span>
+                      <strong style={{ color: show.color }}>{show.day}</strong>
                     </div>
                     <div className="show-fact-row">
-                      <span>Roster</span>
-                      <strong>{stats.roster.length}</strong>
-                    </div>
-                    <div className="show-fact-row">
-                      <span>Booked Matches</span>
-                      <strong>{stats.bookedMatches.length}</strong>
-                    </div>
-                    <div className="show-fact-row">
-                      <span>Special Events</span>
-                      <strong>{stats.brandSpecialShows.length}</strong>
+                      <span style={{ color: 'var(--text3)' }}>Primary Color</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 12, height: 12, borderRadius: 6, background: show.color }} />
+                        <strong>{show.color.toUpperCase()}</strong>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -381,72 +355,39 @@ export default function Shows({
           )
         })()}
 
-      {modal && modal !== 'add' && !modal.type && (
-        <Modal title="Edit Show" onClose={closeModal}>
+      {(modal === 'add' || (modal && !modal.type)) && (
+        <Modal title={modal === 'add' ? 'Establish New Brand' : 'Modify Brand Details'} onClose={closeModal}>
           <form onSubmit={handleSaveShow}>
             {(() => {
-              const show = shows.find((item) => item.id === modal.id)
+              const show = modal !== 'add' ? shows.find((item) => item.id === modal.id) : null
 
               return (
-                <>
+                <div style={{ minWidth: '400px' }}>
                   <div className="form-group">
                     <label>Show Name</label>
-                    <input name="name" defaultValue={show?.name ?? ''} placeholder="e.g. Raw, SmackDown" autoFocus />
+                    <input name="name" defaultValue={show?.name ?? ''} placeholder="e.g. Raw, Dynamite, NJPW Strong" autoFocus />
                   </div>
-                  <div className="form-group">
-                    <label>Day</label>
-                    <select name="day" defaultValue={show?.day ?? 'Monday'}>
-                      {DAY_NAMES.map((dayName) => (
-                        <option key={dayName}>{dayName}</option>
-                      ))}
-                    </select>
+                  <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-group">
+                      <label>Weekly Broadcast Day</label>
+                      <select name="day" defaultValue={show?.day ?? 'Monday'}>
+                        {DAY_NAMES.map((dayName) => (
+                          <option key={dayName}>{dayName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Brand Identity Color</label>
+                      <input name="color" type="color" defaultValue={show?.color ?? '#ff4d00'} style={{ padding: 4, height: 40 }} />
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label>Brand Color</label>
-                    <input name="color" type="color" defaultValue={show?.color ?? '#c0392b'} />
+                  <div className="form-actions" style={{ marginTop: 24 }}>
+                    <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+                    <button type="submit" className="btn btn-primary">{modal === 'add' ? 'Establish Brand' : 'Save Changes'}</button>
                   </div>
-                  <div className="form-actions">
-                    <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      Save
-                    </button>
-                  </div>
-                </>
+                </div>
               )
             })()}
-          </form>
-        </Modal>
-      )}
-
-      {modal === 'add' && (
-        <Modal title="Add Show" onClose={closeModal}>
-          <form onSubmit={handleSaveShow}>
-            <div className="form-group">
-              <label>Show Name</label>
-              <input name="name" placeholder="e.g. Raw, SmackDown" autoFocus />
-            </div>
-            <div className="form-group">
-              <label>Day</label>
-              <select name="day" defaultValue="Monday">
-                {DAY_NAMES.map((dayName) => (
-                  <option key={dayName}>{dayName}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Brand Color</label>
-              <input name="color" type="color" defaultValue="#c0392b" />
-            </div>
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Create
-              </button>
-            </div>
           </form>
         </Modal>
       )}
@@ -458,36 +399,37 @@ export default function Shows({
           if (!show) return null
 
           return (
-            <Modal title={specialShow ? 'Edit Special Show' : 'Add Special Show'} onClose={closeModal}>
+            <Modal title={specialShow ? 'Edit Special Event' : 'Schedule Special Event'} onClose={closeModal}>
               <form onSubmit={handleSaveSpecialShow}>
                 <input type="hidden" name="showId" value={show.id} />
 
                 <div className="form-group">
-                  <label>Parent Show</label>
-                  <input value={show.name} disabled />
+                  <label>Parent Brand</label>
+                  <div style={{ padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, color: show.color, fontWeight: 800 }}>{show.name}</div>
                 </div>
 
                 <div className="form-group">
                   <label>Event Name</label>
-                  <input name="name" defaultValue={specialShow?.name ?? ''} placeholder="e.g. Wrestle Kingdom" autoFocus />
+                  <input name="name" defaultValue={specialShow?.name ?? ''} placeholder="e.g. Wrestle Kingdom, SummerSlam" autoFocus />
                 </div>
 
-                <div className="form-group">
-                  <label>Event Type</label>
-                  <select name="type" defaultValue={specialShow?.type ?? 'annual'}>
-                    <option value="annual">Annual</option>
-                    <option value="one_off">One-Off</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Annual Event Start Year</label>
-                  <input name="startYear" type="number" defaultValue={specialShow?.startYear ?? parseCurrentYear()} min="1" />
+                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="form-group">
+                    <label>Recurrence Type</label>
+                    <select name="type" defaultValue={specialShow?.type ?? 'annual'}>
+                      <option value="annual">Annual Tradition</option>
+                      <option value="one_off">One-Off Event</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Inception Year</label>
+                    <input name="startYear" type="number" defaultValue={specialShow?.startYear ?? parseCurrentYear()} min="1" />
+                  </div>
                 </div>
 
                 <div className="show-special-date-grid">
                   <div className="form-group">
-                    <label>Month</label>
+                    <label>Scheduled Month</label>
                     <select name="month" defaultValue={specialShow?.month ?? 1}>
                       {MONTHS_FULL.map((monthName, index) => (
                         <option key={monthName} value={index + 1}>{monthName}</option>
@@ -495,26 +437,22 @@ export default function Shows({
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Day</label>
+                    <label>Scheduled Day</label>
                     <input name="day" type="number" min="1" max="28" defaultValue={specialShow?.day ?? 1} />
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label>One-Off Date</label>
+                  <label>Fixed Date (One-Offs Only)</label>
                   <input name="oneOffDate" type="date" defaultValue={specialShow?.oneOffDate ?? ''} />
-                  <div className="show-special-help">
-                    Fill this for one-off events. Annual events use month/day every year from the chosen start year onward.
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8, fontStyle: 'italic' }}>
+                    Annual events recurrence is calculated automatically based on Month/Day.
                   </div>
                 </div>
 
-                <div className="form-actions">
-                  <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    {specialShow ? 'Save' : 'Create'}
-                  </button>
+                <div className="form-actions" style={{ marginTop: 24 }}>
+                  <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">{specialShow ? 'Save Changes' : 'Schedule Event'}</button>
                 </div>
               </form>
             </Modal>

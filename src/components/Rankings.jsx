@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { buildRankings } from '../utils/rankings.js'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faFire, faSnowflake } from '@fortawesome/free-solid-svg-icons'
+import { FiSearch, FiFilter, FiTrendingUp, FiTrendingDown, FiActivity, FiAward, FiZap, FiTarget, FiArrowUp, FiArrowDown } from 'react-icons/fi'
 import './Rankings.css'
 
 function getWinPctClass(winPct) {
@@ -84,6 +83,7 @@ export default function Rankings({ state }) {
 
   const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }))
   const resetFilters = () => setFilters({ search: '', show: 'all', align: 'all', gender: 'all', status: 'all' })
+  
   const toggleSort = (key) => {
     if (sortBy === key) {
       setSortDirection((current) => (current === 'desc' ? 'asc' : 'desc'))
@@ -92,28 +92,31 @@ export default function Rankings({ state }) {
     setSortBy(key)
     setSortDirection('desc')
   }
-  const getSortLabel = (key) => {
-    if (sortBy !== key) return ''
-    return sortDirection === 'desc' ? ' ↓' : ' ↑'
+
+  const SortIcon = ({ keyId }) => {
+    if (sortBy !== keyId) return null
+    return sortDirection === 'desc' ? <FiArrowDown /> : <FiArrowUp />
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="page-title">Rankings</h1>
+    <div className="rankings-page">
+      <div className="page-header">
+        <h1 className="page-title">Power Rankings</h1>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FiActivity style={{ color: 'var(--primary)' }} /> REAL-TIME ANALYTICS
+        </div>
       </div>
 
-      <div className="card rankings-filters-card">
+      <div className="rankings-filters-card">
         <div className="rankings-filters-grid">
           <div className="form-group">
-            <label>Search</label>
-            <input value={filters.search} onChange={(e) => updateFilter('search', e.target.value)} placeholder="Search wrestler" />
+            <label><FiSearch /> Search</label>
+            <input value={filters.search} onChange={(e) => updateFilter('search', e.target.value)} placeholder="Filter talent..." />
           </div>
           <div className="form-group">
-            <label>Show</label>
+            <label>Brand</label>
             <select value={filters.show} onChange={(e) => updateFilter('show', e.target.value)}>
-              <option value="all">All shows</option>
-              <option value="">No show</option>
+              <option value="all">All Brands</option>
               {shows.map((show) => (
                 <option key={show.id} value={show.name}>{show.name}</option>
               ))}
@@ -122,41 +125,27 @@ export default function Rankings({ state }) {
           <div className="form-group">
             <label>Alignment</label>
             <select value={filters.align} onChange={(e) => updateFilter('align', e.target.value)}>
-              <option value="all">All alignments</option>
+              <option value="all">All Side</option>
               <option value="Face">Face</option>
               <option value="Heel">Heel</option>
-              <option value="Neutral">Neutral</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Gender</label>
-            <select value={filters.gender} onChange={(e) => updateFilter('gender', e.target.value)}>
-              <option value="all">All genders</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
             </select>
           </div>
           <div className="form-group">
             <label>Status</label>
             <select value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
-              <option value="all">All statuses</option>
+              <option value="all">Any Status</option>
               <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
               <option value="Injured">Injured</option>
-              <option value="Deceased">Deceased</option>
-              <option value="Retired">Retired</option>
             </select>
           </div>
         </div>
         <div className="rankings-filters-footer">
-          <div className="rankings-filters-count">{filteredRows.length} wrestler{filteredRows.length !== 1 ? 's' : ''} shown</div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={resetFilters}>
-            Clear Filters
-          </button>
+          <div className="rankings-filters-count">{filteredRows.length} ATHLETES RANKED</div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={resetFilters}>Reset</button>
         </div>
       </div>
 
-      <div className="card">
+      <div className="rankings-table-card">
         <div className="table-wrap">
           <table>
             <thead>
@@ -164,29 +153,29 @@ export default function Rankings({ state }) {
                 <th>Rank</th>
                 <th>Wrestler</th>
                 <th>
-                  <button type="button" className={`rankings-sort-btn${sortBy === 'prs' ? ' active' : ''}`} onClick={() => toggleSort('prs')}>
-                    PRS{getSortLabel('prs')}
+                  <button type="button" className={`rankings-sort-btn ${sortBy === 'prs' ? 'active' : ''}`} onClick={() => toggleSort('prs')}>
+                    PRS <SortIcon keyId="prs" />
                   </button>
                 </th>
                 <th>
-                  <button type="button" className={`rankings-sort-btn${sortBy === 'winPct' ? ' active' : ''}`} onClick={() => toggleSort('winPct')}>
-                    Win %{getSortLabel('winPct')}
+                  <button type="button" className={`rankings-sort-btn ${sortBy === 'winPct' ? 'active' : ''}`} onClick={() => toggleSort('winPct')}>
+                    Win % <SortIcon keyId="winPct" />
                   </button>
                 </th>
                 <th>Record</th>
                 <th>
-                  <button type="button" className={`rankings-sort-btn${sortBy === 'matches' ? ' active' : ''}`} onClick={() => toggleSort('matches')}>
-                    Matches{getSortLabel('matches')}
+                  <button type="button" className={`rankings-sort-btn ${sortBy === 'matches' ? 'active' : ''}`} onClick={() => toggleSort('matches')}>
+                    Matches <SortIcon keyId="matches" />
                   </button>
                 </th>
                 <th>
-                  <button type="button" className={`rankings-sort-btn${sortBy === 'streak' ? ' active' : ''}`} onClick={() => toggleSort('streak')}>
-                    Streak{getSortLabel('streak')}
+                  <button type="button" className={`rankings-sort-btn ${sortBy === 'streak' ? 'active' : ''}`} onClick={() => toggleSort('streak')}>
+                    Streak <SortIcon keyId="streak" />
                   </button>
                 </th>
                 <th>
-                  <button type="button" className={`rankings-sort-btn${sortBy === 'titles' ? ' active' : ''}`} onClick={() => toggleSort('titles')}>
-                    Titles{getSortLabel('titles')}
+                  <button type="button" className={`rankings-sort-btn ${sortBy === 'titles' ? 'active' : ''}`} onClick={() => toggleSort('titles')}>
+                    Titles <SortIcon keyId="titles" />
                   </button>
                 </th>
               </tr>
@@ -194,30 +183,42 @@ export default function Rankings({ state }) {
             <tbody>
               {filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="empty-state">
-                    No wrestlers match the current filters.
+                  <td colSpan={8} className="empty-state" style={{ padding: '60px 0' }}>
+                    No results for this search criteria.
                   </td>
                 </tr>
               )}
 
               {filteredRows.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.filteredRank}</td>
-                  <td>{row.name}</td>
-                  <td>{row.prs.toFixed(2)}</td>
+                  <td>
+                    <div className={`rank-pill ${row.filteredRank <= 3 ? `rank-pill-${row.filteredRank}` : ''}`}>
+                      {row.filteredRank}
+                    </div>
+                  </td>
+                  <td style={{ fontWeight: 800, fontSize: 14 }}>{row.name}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--primary)' }}>
+                    {row.prs.toFixed(2)}
+                  </td>
                   <td>
                     <span className={getWinPctClass(row.winPct)}>{row.winPct}%</span>
                   </td>
-                  <td>{row.record}</td>
+                  <td style={{ fontSize: 12, fontWeight: 700 }}>{row.record}</td>
                   <td>{row.matches}</td>
                   <td>
                     <span className={getStreakClass(row.streak)}>
-                      {row.streak >= 4 && <FontAwesomeIcon icon={faFire} className="rankings-stat-icon" />}
-                      {row.streak <= -4 && <FontAwesomeIcon icon={faSnowflake} className="rankings-stat-icon" />}
+                      {row.streak >= 4 && <FiZap style={{ fontSize: 10 }} />}
+                      {row.streak <= -4 && <FiActivity style={{ fontSize: 10, opacity: 0.5 }} />}
                       {row.streak > 0 ? `+${row.streak}` : row.streak}
                     </span>
                   </td>
-                  <td>{row.titles}</td>
+                  <td>
+                    {row.titles > 0 ? (
+                      <span style={{ color: 'var(--gold)', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <FiAward /> {row.titles}
+                      </span>
+                    ) : <span style={{ opacity: 0.1 }}>0</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>

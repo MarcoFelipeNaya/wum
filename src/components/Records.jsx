@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
+import { FiAward, FiStar, FiZap, FiActivity, FiTv, FiTrendingUp, FiTarget, FiHash, FiChevronRight } from 'react-icons/fi'
 import './Records.css'
 
 function getParticipantIds(match) {
@@ -34,7 +35,7 @@ function getMatchTeams(match) {
 function formatRecordValue(record, value) {
   if (record.key === 'winPct') return `${value}%`
   if (record.key === 'avgRating') return `${Number(value).toFixed(2)} / 5`
-  if (record.key === 'streak') return `${value} straight`
+  if (record.key === 'streak') return `${value} Wins`
   return String(value)
 }
 
@@ -220,196 +221,111 @@ export default function Records({ state }) {
     }
 
     return [
-      {
-        key: 'matches',
-        title: `Most Matches${scopeLabel}`,
-        subtitle: 'Workhorses with the busiest schedules',
-        accent: '#2980b9',
-        valueLabel: 'matches',
-        rows: sortAndTrim(rows, (row) => row.totalMatches),
-      },
-      {
-        key: 'wins',
-        title: `Most Wins${scopeLabel}`,
-        subtitle: 'The winningest names in the universe',
-        accent: '#27ae60',
-        valueLabel: 'wins',
-        rows: sortAndTrim(rows, (row) => row.wins),
-      },
-      {
-        key: 'streak',
-        title: `Longest Win Streaks${scopeLabel}`,
-        subtitle: 'Current runs of dominant form',
-        accent: '#ff851b',
-        valueLabel: 'straight wins',
-        rows: sortAndTrim(rows, (row) => row.streak),
-      },
-      {
-        key: 'mainEvents',
-        title: `Most Main Events${scopeLabel}`,
-        subtitle: 'Most appearances in the featured match slot',
-        accent: '#d4af37',
-        valueLabel: 'main events',
-        rows: sortAndTrim(rows, (row) => row.mainEventMatches),
-      },
-      {
-        key: 'fiveStars',
-        title: `Most 5-Star Matches${scopeLabel}`,
-        subtitle: 'Classic performances rated the full five',
-        accent: '#9b59b6',
-        valueLabel: '5-star matches',
-        rows: sortAndTrim(rows, (row) => row.fiveStarMatches),
-      },
-      {
-        key: 'winPct',
-        title: `Best Win Percentage${scopeLabel}`,
-        subtitle: 'Minimum 5 recorded matches',
-        accent: '#16a085',
-        valueLabel: 'win rate',
-        rows: sortAndTrim(rows.filter((row) => row.totalMatches >= 5), (row) => row.winPct),
-      },
-      {
-        key: 'avgRating',
-        title: `Best Average Rating${scopeLabel}`,
-        subtitle: 'Minimum 3 rated matches',
-        accent: '#e67e22',
-        valueLabel: 'avg rating',
-        rows: sortAndTrim(rows.filter((row) => row.ratedMatches >= 3), (row) => row.averageRating, { minValue: 0.5 }),
-      },
-      {
-        key: 'titleWins',
-        title: `Most Title Match Wins${scopeLabel}`,
-        subtitle: 'Big-match success when gold was on the line',
-        accent: '#c0392b',
-        valueLabel: 'title wins',
-        rows: sortAndTrim(rows, (row) => row.titleMatchWins),
-      },
+      { key: 'matches', title: `Volume Leader${scopeLabel}`, subtitle: 'Highest career match counts', accent: '#3498db', icon: <FiActivity />, rows: sortAndTrim(rows, r => r.totalMatches) },
+      { key: 'wins', title: `Hall of Wins${scopeLabel}`, subtitle: 'Most career victories', accent: '#2ecc71', icon: <FiZap />, rows: sortAndTrim(rows, r => r.wins) },
+      { key: 'streak', title: `Unstoppable Runs${scopeLabel}`, subtitle: 'Longest active win streaks', accent: '#e67e22', icon: <FiTrendingUp />, rows: sortAndTrim(rows, r => r.streak) },
+      { key: 'mainEvents', title: `Main Eventers${scopeLabel}`, subtitle: 'Most frequent show-closers', accent: '#f1c40f', icon: <FiAward />, rows: sortAndTrim(rows, r => r.mainEventMatches) },
+      { key: 'fiveStars', title: `Elite Standard${scopeLabel}`, subtitle: 'Most 5-star rated classics', accent: '#9b59b6', icon: <FiStar />, rows: sortAndTrim(rows, r => r.fiveStarMatches) },
+      { key: 'winPct', title: `Dominance Rate${scopeLabel}`, subtitle: 'Best win percentage (Min. 5)', accent: '#16a085', icon: <FiTarget />, rows: sortAndTrim(rows.filter(r => r.totalMatches >= 5), r => r.winPct) },
+      { key: 'avgRating', title: `Work Rate Elite${scopeLabel}`, subtitle: 'Best avg rating (Min. 3)', accent: '#ff4d00', icon: <FiActivity />, rows: sortAndTrim(rows.filter(r => r.ratedMatches >= 3), r => r.averageRating, { minValue: 0.5 }) },
+      { key: 'titleWins', title: `Big Match Players${scopeLabel}`, subtitle: 'Most wins in title bouts', accent: '#e74c3c', icon: <FiAward />, rows: sortAndTrim(rows, r => r.titleMatchWins) },
     ]
   }
 
   const singlesCards = useMemo(() => buildRecordCards(recordRows, ''), [recordRows])
   const teamCards = useMemo(() => buildRecordCards(teamRecordRows, ' (Teams)'), [teamRecordRows])
   const recordCards = [...singlesCards, ...teamCards]
-
   const activeCard = recordCards.find((card) => card.title === activeRecord) || null
+
+  const RecordCategory = ({ title, cards }) => (
+    <div className="records-section">
+      <div className="records-section-heading">{title}</div>
+      <div className="records-grid">
+        {cards.map(card => (
+          <div key={card.title} className="records-card" onClick={() => setActiveRecord(card.title)}>
+            <div className="records-card-accent" style={{ background: `linear-gradient(90deg, ${card.accent}, transparent)` }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="records-card-kicker" style={{ color: card.accent }}>{card.key.replace(/([A-Z])/g, ' $1').toUpperCase()}</div>
+                <h3 className="records-card-title">{card.title}</h3>
+              </div>
+              <div style={{ fontSize: 24, color: 'var(--text3)', opacity: 0.5 }}>{card.icon}</div>
+            </div>
+            <p className="records-card-copy">{card.subtitle}</p>
+            {card.rows.length === 0 ? (
+              <div className="records-empty-state">No recorded data.</div>
+            ) : (
+              <div className="records-list">
+                {card.rows.slice(0, 4).map((row, index) => (
+                  <div key={row.id} className="records-list-row">
+                    <span className="records-list-rank">#{index + 1}</span>
+                    <div>
+                      <div className="records-list-name">{row.name}</div>
+                      <div className="records-list-meta">{row.type || row.show}</div>
+                    </div>
+                    <span className="records-list-value" style={{ color: card.accent }}>{formatRecordValue(card, getRecordRowValue(card.key, row))}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: card.accent, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', marginTop: 12 }}>
+              Leaderboard <FiChevronRight />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   return (
     <div className="records-page">
       <div className="page-header">
-        <h1 className="page-title">Records & Accolades</h1>
+        <h1 className="page-title">Hall of Records</h1>
       </div>
 
-      <div className="records-intro card">
-        <div className="records-intro-kicker">Universe Milestones</div>
+      <div className="records-intro">
+        <div className="records-intro-kicker">Career Accolades</div>
         <p className="records-intro-copy">
-          A spotlight on the most impressive resumes in your save, from workhorse volume to main-event status and elite match quality.
+          Tracking the most significant career milestones in your universe. From workhorses to main event legends, these leaderboards celebrate the elite.
         </p>
       </div>
 
-      <div className="records-section">
-        <div className="records-section-heading">Singles Records</div>
-        <div className="records-grid">
-          {singlesCards.map((card) => (
-            <div key={card.title} className="records-card" onClick={() => setActiveRecord(card.title)}>
-              <div className="records-card-accent" style={{ background: `linear-gradient(90deg, ${card.accent}, transparent)` }} />
-              <div className="records-card-head">
-                <div>
-                  <div className="records-card-kicker" style={{ color: card.accent }}>{card.valueLabel}</div>
-                  <h3 className="records-card-title">{card.title}</h3>
-                </div>
-                <div className="records-card-open" style={{ color: card.accent }}>Top 25</div>
-              </div>
-              <div className="records-card-copy">{card.subtitle}</div>
-
-              {card.rows.length === 0 ? (
-                <div className="records-empty-state">Not enough completed data yet.</div>
-              ) : (
-                <div className="records-list">
-                  {card.rows.slice(0, 5).map((row, index) => (
-                    <div key={row.id} className="records-list-row">
-                      <div className="records-list-rank">#{index + 1}</div>
-                      <div className="records-list-main">
-                        <div className="records-list-name">{row.name}</div>
-                        <div className="records-list-meta">{row.show}</div>
-                      </div>
-                      <div className="records-list-value">{formatRecordValue(card, getRecordRowValue(card.key, row))}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="records-section">
-        <div className="records-section-heading">Team & Trios Records</div>
-        <div className="records-grid">
-          {teamCards.map((card) => (
-            <div key={card.title} className="records-card" onClick={() => setActiveRecord(card.title)}>
-              <div className="records-card-accent" style={{ background: `linear-gradient(90deg, ${card.accent}, transparent)` }} />
-              <div className="records-card-head">
-                <div>
-                  <div className="records-card-kicker" style={{ color: card.accent }}>{card.valueLabel}</div>
-                  <h3 className="records-card-title">{card.title}</h3>
-                </div>
-                <div className="records-card-open" style={{ color: card.accent }}>Top 25</div>
-              </div>
-              <div className="records-card-copy">{card.subtitle}</div>
-
-              {card.rows.length === 0 ? (
-                <div className="records-empty-state">Not enough completed data yet.</div>
-              ) : (
-                <div className="records-list">
-                  {card.rows.slice(0, 5).map((row, index) => (
-                    <div key={row.id} className="records-list-row">
-                      <div className="records-list-rank">#{index + 1}</div>
-                      <div className="records-list-main">
-                        <div className="records-list-name">{row.name}</div>
-                        <div className="records-list-meta">{row.type} · {row.show}</div>
-                      </div>
-                      <div className="records-list-value">{formatRecordValue(card, getRecordRowValue(card.key, row))}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <RecordCategory title="Singles Accolades" cards={singlesCards} />
+      <RecordCategory title="Tag Team & Trios Honors" cards={teamCards} />
 
       {activeCard && (
-        <Modal title={activeCard.title} onClose={() => setActiveRecord(null)} style={{ maxWidth: '920px' }}>
-          <div className="records-modal-shell">
-            <div className="records-modal-header">
-              <div className="records-modal-kicker" style={{ color: activeCard.accent }}>{activeCard.valueLabel}</div>
-              <div className="records-modal-copy">{activeCard.subtitle}</div>
+        <Modal title={activeCard.title} onClose={() => setActiveRecord(null)} style={{ maxWidth: '900px' }}>
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: 20, background: 'var(--bg3)', borderRadius: 12, borderLeft: `4px solid ${activeCard.accent}` }}>
+              <div style={{ fontSize: 32, color: activeCard.accent }}>{activeCard.icon}</div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', color: activeCard.accent }}>{activeCard.key.toUpperCase()}</div>
+                <div style={{ fontSize: 14, color: 'var(--text2)' }}>{activeCard.subtitle}</div>
+              </div>
             </div>
 
-            {activeCard.rows.length === 0 ? (
-              <div className="records-empty-state">Not enough completed data yet.</div>
-            ) : (
-              <div className="records-modal-table">
-                <div className="records-modal-table-head">
-                  <span>Rank</span>
-                  <span>Competitor</span>
-                  <span>Show</span>
-                  <span>{activeCard.valueLabel}</span>
-                </div>
-                <div className="records-modal-table-body">
-                  {activeCard.rows.map((row, index) => (
-                    <div key={row.id} className="records-modal-row">
-                      <span className="records-modal-rank">#{index + 1}</span>
-                      <span className="records-modal-name">{row.name}</span>
-                      <span className="records-modal-show">{row.show}</span>
-                      <span className="records-modal-value" style={{ color: activeCard.accent }}>
-                        {formatRecordValue(activeCard, getRecordRowValue(activeCard.key, row))}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <table className="reign-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Name</th>
+                  <th>Brand / Type</th>
+                  <th style={{ textAlign: 'right' }}>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeCard.rows.map((row, index) => (
+                  <tr key={row.id}>
+                    <td style={{ fontWeight: 900, opacity: 0.3 }}>#{index + 1}</td>
+                    <td style={{ fontWeight: 800, fontSize: 15 }}>{row.name}</td>
+                    <td style={{ color: 'var(--text3)', fontSize: 12 }}>{row.type || row.show}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 900, color: activeCard.accent }}>
+                      {formatRecordValue(activeCard, getRecordRowValue(activeCard.key, row))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Modal>
       )}

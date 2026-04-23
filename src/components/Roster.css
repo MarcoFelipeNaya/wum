@@ -1,61 +1,138 @@
-.wrestler-name { font-weight: 600; font-family: var(--font-compact); font-size: 14px; letter-spacing: .3px; }
-
-.pct {
-  font-weight: bold;
+.roster-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.pct-good {
-  color: green;
-}
-
-.pct-mid {
-  color: orange;
-}
-
-.pct-bad {
-  color: red;
-}
-
+/* FILTERS SECTION */
 .filters-card {
-  margin-bottom: 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
 }
 
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .filters-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  padding-top: 12px;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
 .filters-count {
-  font-size: 12px;
-  color: var(--text2);
-  font-weight: 600;
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* TABLE ENHANCEMENTS */
+.roster-table-card {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.wrestler-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wrestler-avatar {
+  width: 36px;
+  height: 36px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--primary);
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.wrestler-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.wrestler-name {
+  font-weight: 800;
+  font-family: var(--font-compact);
+  font-size: 15px;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.wrestler-sub {
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.4px;
 }
 
 .roster-title-badge {
   display: inline-flex;
   align-items: center;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-right: 4px;
   margin-bottom: 4px;
-  padding: 6px 10px;
-  font-size: 11px;
-  line-height: 1.2;
-  white-space: normal;
-  max-width: 220px;
 }
 
-@media (max-width: 640px) {
-  .filters-footer {
-    flex-direction: column;
-    align-items: stretch;
+/* CUSTOM BADGES */
+.badge-pro {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border: 1px solid transparent;
+}
+
+.badge-face { background: rgba(39, 174, 96, 0.1); color: #2ecc71; border-color: rgba(39, 174, 96, 0.2); }
+.badge-heel { background: rgba(192, 57, 43, 0.1); color: #e74c3c; border-color: rgba(192, 57, 43, 0.2); }
+.badge-neutral { background: rgba(255, 255, 255, 0.05); color: #bdc3c7; border-color: rgba(255, 255, 255, 0.1); }
+
+.record-pill {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--bg3);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.record-win { color: var(--green); font-weight: 800; }
+.record-loss { color: var(--red); font-weight: 800; }
+
+@media (max-width: 768px) {
+  .roster-table-card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 }

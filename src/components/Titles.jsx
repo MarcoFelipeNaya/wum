@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
 import { daysBetween, formatUniverseDate } from '../utils/dates.js'
+import { FiAward, FiStar, FiTrendingUp, FiSettings, FiEdit3, FiTrash2, FiPlus, FiChevronRight, FiUsers, FiClock } from 'react-icons/fi'
 import './Titles.css'
 
 function getChampIds(title) {
@@ -44,7 +45,7 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
   const getW = (id) => wrestlers.find((w) => w.id === id)
   const getTeamById = (id) => teams.find((team) => team.id === id)
   const getShowByName = (name) => shows.find((show) => show.name === name)
-  const getBrandColor = (showName) => getShowByName(showName)?.color || 'var(--primary)'
+  const getBrandColor = (showName) => getShowByName(showName)?.color || 'var(--gold)'
 
   const currentDaysHeld = (champSince) => {
     if (!champSince) return 0
@@ -165,74 +166,53 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
     const days = getChampIds(title).length > 0 ? currentDaysHeld(title.champSince) : 0
     const lineage = getTitleLineage(title)
     const mostCombinedDays = lineage[0] || null
-    const mostReigns = lineage.length > 0
-      ? [...lineage].sort((a, b) => {
-          if (b.reigns !== a.reigns) return b.reigns - a.reigns
-          if (b.totalDays !== a.totalDays) return b.totalDays - a.totalDays
-          return (getW(a.champId)?.name ?? '').localeCompare(getW(b.champId)?.name ?? '')
-        })[0]
-      : null
     const type = getTitleType(title)
     const accent = getBrandColor(title.show)
 
     return (
       <div className="title-compact-card" onClick={() => setModal({ type: 'detail', id: title.id })}>
         <div className="title-card-accent" style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }} />
-        <div className="title-card-header">
-          <div className="title-card-header-main">
-            <div className="title-card-badges">
-              <span className="title-card-badge" style={{ background: `${accent}22`, color: accent, borderColor: `${accent}44` }}>
-                {getTitleTypeLabel(title)}
-              </span>
-              <span
-                className="title-card-badge"
-                style={{ background: `${accent}18`, color: accent, borderColor: `${accent}33` }}
-              >
-                {title.show}
-              </span>
-            </div>
-            <h3 className="title-card-name">{title.name}</h3>
-          </div>
+        
+        <div className="title-card-badges">
+          <span className="title-card-badge" style={{ background: `${accent}22`, color: accent, borderColor: `${accent}44` }}>
+            {getTitleTypeLabel(title)}
+          </span>
+          <span className="title-card-badge" style={{ background: 'var(--bg3)', color: 'var(--text3)', borderColor: 'var(--border2)' }}>
+            {title.show}
+          </span>
         </div>
+
+        <h3 className="title-card-name">{title.name}</h3>
 
         <div className="title-card-champion-row">
           <div className="title-card-section-label">Current Champion</div>
-          <div className={`title-card-champion ${championLabel === 'Vacant' ? 'vacant' : ''}`}>{championLabel}</div>
-          <div className="title-card-subtle">{championLabel === 'Vacant' ? 'Awaiting a champion' : `${days} day${days !== 1 ? 's' : ''} in current reign`}</div>
+          <div className={`title-card-champion ${championLabel === 'Vacant' ? 'vacant' : ''}`}>
+            {championLabel}
+          </div>
+          <div className="title-card-subtle">
+            {championLabel === 'Vacant' ? 'Awaiting crown' : `${days} days active`}
+          </div>
         </div>
 
         <div className="title-card-reign-strip">
           <div
             className="title-card-reign-fill"
-            style={{ width: `${Math.min(100, Math.max(18, days * 1.2 || 18))}%`, background: `linear-gradient(90deg, ${accent}, rgba(255,255,255,0.08))` }}
+            style={{ width: `${Math.min(100, Math.max(15, days / 2))}%`, background: `linear-gradient(90deg, ${accent}, transparent)` }}
           />
         </div>
 
-        {(mostCombinedDays || mostReigns) && (
-          <div className="title-card-highlights">
-            {mostCombinedDays && (
-              <span className="badge badge-gold">
-                Most days: {getW(mostCombinedDays.champId)?.name ?? 'Unknown'} ({mostCombinedDays.totalDays}d)
-              </span>
-            )}
-            {mostReigns && (
-              <span className="badge badge-gold">
-                Most reigns: {getW(mostReigns.champId)?.name ?? 'Unknown'} ({mostReigns.reigns})
-              </span>
-            )}
-          </div>
-        )}
-
         <div className="title-card-footer">
-          <div>
+          <div className="title-card-stat-group">
             <div className="title-card-stat">{title.history.length}</div>
             <div className="title-card-stat-label">Past Reigns</div>
           </div>
-          <div>
+          <div className="title-card-stat-group">
             <div className="title-card-stat">{lineage.length}</div>
-            <div className="title-card-stat-label">Champions</div>
+            <div className="title-card-stat-label">Unique Champs</div>
           </div>
-          <div className="title-card-open">View Details</div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 800, color: accent, textTransform: 'uppercase' }}>
+            Prestige <FiChevronRight />
+          </div>
         </div>
       </div>
     )
@@ -240,69 +220,65 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
 
   return (
     <div className="titles-page">
-      <div className="titles-hero card">
+      <div className="titles-hero">
         <div className="titles-hero-copy">
-          <div className="titles-hero-kicker">Heat Championship Office</div>
-          <h1 className="page-title">Championships</h1>
+          <div className="titles-hero-kicker">Universe Championship Authority</div>
+          <h1 className="page-title">Championship Records</h1>
           <p className="titles-hero-subtle">
-            Follow every belt across the universe, from current champions and reigning dynasties to full lineage and brand identity.
+            Managing the gold across the brands. Track reigns, lineage, and the prestige of your universe's highest honors.
           </p>
         </div>
         <div className="titles-hero-actions">
           <button className="btn btn-primary" onClick={() => setModal('add')}>
-            + Create Title
+            <FiPlus /> Create New Belt
           </button>
         </div>
       </div>
 
       <div className="titles-overview-grid">
         <div className="titles-overview-card">
-          <div className="titles-overview-label">Total Titles</div>
+          <div className="titles-overview-label">Total Honors</div>
           <div className="titles-overview-value">{titles.length}</div>
-          <div className="titles-overview-meta">All singles, tag, trios, and universe-level championships.</div>
+          <div className="titles-overview-meta">Championships established in current universe.</div>
         </div>
         <div className="titles-overview-card">
-          <div className="titles-overview-label">Active Champions</div>
+          <div className="titles-overview-label">Active Belts</div>
           <div className="titles-overview-value">{activeChampionships}</div>
-          <div className="titles-overview-meta">Belts currently assigned to a champion or champion team.</div>
+          <div className="titles-overview-meta">Belts currently held by active talent.</div>
         </div>
         <div className="titles-overview-card">
-          <div className="titles-overview-label">Universe Titles</div>
+          <div className="titles-overview-label">Universe-Level</div>
           <div className="titles-overview-value">{universeTitles}</div>
-          <div className="titles-overview-meta">Championships that sit above one weekly brand.</div>
+          <div className="titles-overview-meta">Belts that cross brand boundaries.</div>
         </div>
         <div className="titles-overview-card">
-          <div className="titles-overview-label">Active Brands</div>
+          <div className="titles-overview-label">Brand Rep</div>
           <div className="titles-overview-value">{activeBrands}</div>
-          <div className="titles-overview-meta">Brands represented across the current title landscape.</div>
+          <div className="titles-overview-meta">Distinct brands with exclusive honors.</div>
         </div>
       </div>
 
-      <div className="card title-filter-card">
-        <div className="title-filter-row">
-          <div className="form-group title-filter-field">
-            <label>Show</label>
-            <select value={showFilter} onChange={(e) => setShowFilter(e.target.value)}>
-              <option value="all">All titles</option>
-              <option value="Universe">Universe-wide</option>
-              {shows.map((show) => (
-                <option key={show.id} value={show.name}>{show.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="title-filter-meta">
-            <div className="title-filter-count">{filteredTitles.length} title{filteredTitles.length !== 1 ? 's' : ''} shown</div>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowFilter('all')}>
-              Clear Filter
-            </button>
-          </div>
+      <div className="card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="form-group" style={{ marginBottom: 0, minWidth: 240 }}>
+          <label><FiAward /> Filter by Brand</label>
+          <select value={showFilter} onChange={(e) => setShowFilter(e.target.value)}>
+            <option value="all">All Brands</option>
+            <option value="Universe">Universe-wide</option>
+            {shows.map((show) => (
+              <option key={show.id} value={show.name}>{show.name}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)' }}>
+          {filteredTitles.length} TITLES TRACKED
         </div>
       </div>
 
       <div className="titles-compact-grid">
         {filteredTitles.length === 0 && (
-          <div className="empty-state card" style={{ gridColumn: '1 / -1' }}>
-            <p>No championships match the selected show.</p>
+          <div className="empty-state card" style={{ gridColumn: '1 / -1', padding: '60px 0' }}>
+            <FiAward style={{ fontSize: 48, opacity: 0.1, marginBottom: 16 }} />
+            <p>No championships match the selected criteria.</p>
           </div>
         )}
         {filteredTitles.map((title) => (
@@ -322,144 +298,115 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
           const accent = getBrandColor(title.show)
 
           return (
-            <Modal title={title.name} onClose={() => setModal(null)} style={{ maxWidth: '980px' }}>
+            <Modal title={title.name} onClose={() => setModal(null)} style={{ maxWidth: '1000px' }}>
               <div className="title-detail-shell">
                 <div className="title-detail-main">
-                  <div className="title-detail-meta-row">
-                    <span className="title-card-badge" style={{ background: `${accent}22`, color: accent, borderColor: `${accent}44` }}>
-                      {getTitleTypeLabel(title)}
-                    </span>
-                    <span className="title-card-badge" style={{ background: `${accent}18`, color: accent, borderColor: `${accent}33` }}>
-                      {title.show}
-                    </span>
-                  </div>
-
-                  <div className="title-detail-current">
+                  <div className="title-detail-current" style={{ borderTop: `4px solid ${accent}` }}>
                     <div className="title-detail-heading">Current Champion</div>
-                    <div className={`title-detail-champion ${championLabel === 'Vacant' ? 'vacant' : ''}`}>{championLabel}</div>
-                    <div className="title-detail-subtle">
-                      {championLabel === 'Vacant' ? 'This title is currently vacant.' : `Current reign: ${days} day${days !== 1 ? 's' : ''}`}
+                    <div className={`title-detail-champion ${championLabel === 'Vacant' ? 'vacant' : ''}`}>
+                      {championLabel}
                     </div>
-                    <div className="title-detail-reign-strip">
+                    <div className="title-detail-subtle">
+                      {championLabel === 'Vacant' ? 'No active champion crowned' : `${days} day reign in progress`}
+                    </div>
+                    <div className="title-card-reign-strip" style={{ marginTop: 16, height: 8 }}>
                       <div
-                        className="title-detail-reign-fill"
-                        style={{ width: `${Math.min(100, Math.max(18, days * 1.2 || 18))}%`, background: `linear-gradient(90deg, ${accent}, rgba(255,255,255,0.08))` }}
+                        className="title-card-reign-fill"
+                        style={{ width: `${Math.min(100, Math.max(10, days / 3))}%`, background: `linear-gradient(90deg, ${accent}, transparent)` }}
                       />
                     </div>
                   </div>
 
                   <div className="title-detail-section">
-                    <div className="title-detail-heading">Lineage</div>
+                    <div className="title-detail-heading">Lineage & Hall of Records</div>
                     {lineage.length === 0 ? (
-                      <div className="title-detail-empty">No completed lineage yet.</div>
+                      <div className="empty-state">No champions recorded in history.</div>
                     ) : (
-                      <div className="reign-history">
-                        <table className="reign-table">
-                          <thead>
-                            <tr>
-                              <th>Champion</th>
-                              <th>Reigns</th>
-                              <th>Total Days</th>
+                      <table className="reign-table">
+                        <thead>
+                          <tr>
+                            <th>Champion</th>
+                            <th>Total Reigns</th>
+                            <th>Combined Days</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lineage.map((entry, index) => (
+                            <tr key={index}>
+                              <td style={{ fontWeight: 800 }}>{getW(entry.champId)?.name ?? 'Unknown'}</td>
+                              <td><span className="badge badge-gray">{entry.reigns}</span></td>
+                              <td><span className="badge" style={{ background: `${accent}15`, color: accent }}>{entry.totalDays}d</span></td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {lineage.map((entry, index) => (
-                              <tr key={index}>
-                                <td>{getW(entry.champId)?.name ?? 'Unknown'}</td>
-                                <td><span className="badge badge-gold">{entry.reigns}</span></td>
-                                <td><span className="badge badge-gold">{entry.totalDays}d</span></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     )}
                   </div>
 
                   <div className="title-detail-section">
-                    <div className="title-detail-heading">Past Reigns</div>
+                    <div className="title-detail-heading">Recent Successions</div>
                     {title.history.length === 0 ? (
-                      <div className="title-detail-empty">No previous reigns recorded.</div>
+                      <div className="empty-state">Belts yet to change hands.</div>
                     ) : (
-                      <div className="reign-history">
-                        <table className="reign-table">
-                          <thead>
-                            <tr>
-                              <th>Champion</th>
-                              <th>Won</th>
-                              <th>Lost</th>
-                              <th>Days</th>
-                              <th>Remove</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[...title.history].reverse().map((entry, index) => {
-                              const originalIndex = title.history.length - 1 - index
-                              const championNames = compactReignIds(entry).map((id) => getW(id)?.name ?? 'Unknown').join(' / ')
+                      <table className="reign-table">
+                        <thead>
+                          <tr>
+                            <th>Champion</th>
+                            <th>Tenure</th>
+                            <th>Days</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...title.history].reverse().slice(0, 5).map((entry, index) => {
+                            const originalIndex = title.history.length - 1 - index
+                            const championNames = compactReignIds(entry).map((id) => getW(id)?.name ?? 'Unknown').join(' / ')
 
-                              return (
-                                <tr key={index}>
-                                  <td>{championNames}</td>
-                        <td>{entry.wonDate ? formatUniverseDate(entry.wonDate) : '-'}</td>
-                        <td>{entry.lostDate ? formatUniverseDate(entry.lostDate) : '-'}</td>
-                                  <td><span className="badge badge-gold">{entry.days}d</span></td>
-                                  <td>
-                                    <button
-                                      type="button"
-                                      className="btn btn-danger btn-sm"
-                                      onClick={() => {
-                                        removeTitleHistory(title.id, originalIndex)
-                                        showToast('Past reign removed')
-                                      }}
-                                    >
-                                      X
-                                    </button>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                            return (
+                              <tr key={index}>
+                                <td style={{ fontSize: 12 }}>{championNames}</td>
+                                <td style={{ fontSize: 11, color: 'var(--text3)' }}>
+                                  {entry.wonDate ? formatUniverseDate(entry.wonDate) : '-'} to {entry.lostDate ? formatUniverseDate(entry.lostDate) : '-'}
+                                </td>
+                                <td><span style={{ fontWeight: 700 }}>{entry.days}d</span></td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button className="btn btn-icon btn-danger btn-sm" onClick={() => removeTitleHistory(title.id, originalIndex)}><FiTrash2 /></button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     )}
                   </div>
                 </div>
 
                 <div className="title-detail-side">
-                  <div className="title-side-card">
-                    <div className="title-detail-heading">Title Actions</div>
-                    <button className="btn btn-primary" onClick={() => setModal({ type: 'assign', id: title.id })}>
-                      Assign Champion
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => {
-                        deleteTitle(title.id)
-                        showToast('Title removed')
-                        setModal(null)
-                      }}
-                    >
-                      Delete Title
-                    </button>
+                  <div className="title-side-card" style={{ borderTop: `4px solid ${accent}` }}>
+                    <div className="title-detail-heading">Administration</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <button className="btn btn-primary" onClick={() => setModal({ type: 'assign', id: title.id })}>
+                        <FiTrendingUp /> Crown Champion
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => { if(confirm('Delete title?')) { deleteTitle(title.id); setModal(null); showToast('Belt destroyed'); } }}>
+                        <FiTrash2 /> Retire Title
+                      </button>
+                    </div>
                   </div>
 
                   <div className="title-side-card">
-                    <div className="title-detail-heading">Quick Facts</div>
+                    <div className="title-detail-heading">Belt Specs</div>
                     <div className="title-fact-row">
-                      <span>Type</span>
+                      <span style={{ color: 'var(--text3)' }}>Class</span>
                       <strong>{getTitleTypeLabel(title)}</strong>
                     </div>
                     <div className="title-fact-row">
-                      <span>Brand</span>
-                      <strong>{title.show}</strong>
+                      <span style={{ color: 'var(--text3)' }}>Division</span>
+                      <strong style={{ color: accent }}>{title.show}</strong>
                     </div>
                     <div className="title-fact-row">
-                      <span>Champion Slots</span>
-                      <strong>{getRequiredChampionCount(title)}</strong>
-                    </div>
-                    <div className="title-fact-row">
-                      <span>Recorded Reigns</span>
-                      <strong>{title.history.length}</strong>
+                      <span style={{ color: 'var(--text3)' }}>Active Since</span>
+                      <strong>{title.history.length > 0 ? formatUniverseDate(title.history[0].wonDate) : 'Brand Launch'}</strong>
                     </div>
                   </div>
                 </div>
@@ -469,39 +416,36 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
         })()}
 
       {modal === 'add' && (
-        <Modal title="Create Championship" onClose={() => setModal(null)}>
+        <Modal title="Commission New Championship" onClose={() => setModal(null)}>
           <form onSubmit={handleAdd}>
-            <div className="form-group">
-              <label>Title Name</label>
-              <input name="name" placeholder="e.g. World Heavyweight Championship" autoFocus />
-            </div>
-
-            <div className="form-group">
-              <label>Championship Type</label>
-              <select name="type" defaultValue="singles">
-                <option value="singles">Singles</option>
-                <option value="tag">Tag Team</option>
-                <option value="trios">Trios</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Brand</label>
-              <select name="show" defaultValue="Universe">
-                <option value="Universe">Universe-wide</option>
-                {shows.map((s) => (
-                  <option key={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Create
-              </button>
+            <div style={{ minWidth: '400px' }}>
+              <div className="form-group">
+                <label>Belt Designation</label>
+                <input name="name" placeholder="e.g. World Heavyweight Championship" autoFocus />
+              </div>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-group">
+                  <label>Weight Class / Type</label>
+                  <select name="type" defaultValue="singles">
+                    <option value="singles">Singles</option>
+                    <option value="tag">Tag Team</option>
+                    <option value="trios">Trios</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Brand Assignment</label>
+                  <select name="show" defaultValue="Universe">
+                    <option value="Universe">Universe-wide</option>
+                    {shows.map((s) => (
+                      <option key={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-actions" style={{ marginTop: 24 }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Establish Honor</button>
+              </div>
             </div>
           </form>
         </Modal>
@@ -511,60 +455,50 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
         (() => {
           const title = titles.find((item) => item.id === modal.id)
           if (!title) return null
-
           const titleType = getTitleType(title)
           const requiredCount = getRequiredChampionCount(title)
           const currentChampIds = getChampIds(title)
           const eligibleTeams = titleType === 'tag' ? tagTeams : titleType === 'trios' ? triosTeams : []
 
           return (
-            <Modal title="Assign Champion" onClose={() => setModal(null)}>
-              <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
-                {title.name} ({getTitleTypeLabel(title)})
+            <Modal title="Crowning Ceremony" onClose={() => setModal(null)}>
+              <div style={{ padding: '12px 16px', background: 'var(--bg3)', borderRadius: 8, marginBottom: 20, borderLeft: `4px solid ${getBrandColor(title.show)}` }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text3)', textTransform: 'uppercase' }}>Crowning For</div>
+                <div style={{ fontSize: 16, fontWeight: 900 }}>{title.name}</div>
               </div>
 
-              <form onSubmit={handleAssign}>
+              <form onSubmit={handleAssign} style={{ minWidth: '400px' }}>
                 {titleType === 'singles' ? (
                   <div className="form-group">
-                    <label>Champion</label>
+                    <label>Select Champion</label>
                     <select name="champ" defaultValue={currentChampIds[0] ?? ''}>
-                      <option value="">Vacant</option>
+                      <option value="">Vacate Championship</option>
                       {competitiveWrestlers.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
+                        <option key={w.id} value={w.id}>{w.name}</option>
                       ))}
                     </select>
                   </div>
                 ) : (
                   <>
                     <div className="form-group">
-                      <label>{getTitleTypeLabel(title)} Team</label>
+                      <label>Team Designation</label>
                       <select name="teamId" defaultValue="">
-                        <option value="">Manual selection</option>
+                        <option value="">Manual Member Selection</option>
                         {eligibleTeams.map((team) => (
                           <option key={team.id} value={team.id}>
-                            {team.name} ({team.memberIds.map((id) => getW(id)?.name ?? 'Unknown').join(' / ')})
+                            {team.name}
                           </option>
                         ))}
                       </select>
-                      <div className="title-form-hint">
-                        {eligibleTeams.length > 0
-                          ? `Pick an existing ${titleType === 'tag' ? 'tag team' : 'trios team'}, or manually select ${requiredCount} wrestlers below.`
-                          : `No saved ${titleType === 'tag' ? 'tag teams' : 'trios teams'} yet. Select ${requiredCount} wrestlers manually.`}
-                      </div>
                     </div>
-
-                    <div className="title-manual-grid">
+                    <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                       {Array.from({ length: requiredCount }).map((_, index) => (
                         <div key={index} className="form-group">
-                          <label>Champion {index + 1}</label>
+                          <label>Partner {index + 1}</label>
                           <select name={`champ_${index}`} defaultValue={currentChampIds[index] ?? ''}>
-                            <option value="">Select wrestler</option>
+                            <option value="">Select Talent</option>
                             {competitiveWrestlers.map((w) => (
-                              <option key={w.id} value={w.id}>
-                                {w.name}
-                              </option>
+                              <option key={w.id} value={w.id}>{w.name}</option>
                             ))}
                           </select>
                         </div>
@@ -572,25 +506,18 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
                     </div>
                   </>
                 )}
-
                 <div className="form-group">
-                  <label>Reign Days</label>
+                  <label><FiClock /> Tenure Adjust (Days Held)</label>
                   <input
                     name="reignDays"
                     type="number"
                     min="0"
                     defaultValue={currentChampIds.length > 0 ? currentDaysHeld(title.champSince) : 0}
-                    placeholder="0"
                   />
                 </div>
-
-                <div className="form-actions">
-                  <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    Confirm
-                  </button>
+                <div className="form-actions" style={{ marginTop: 24 }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">Crown Champion</button>
                 </div>
               </form>
             </Modal>
