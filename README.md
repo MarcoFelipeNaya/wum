@@ -43,6 +43,37 @@ Use the production preview when testing:
 
 The service worker does not register in `npm run dev`.
 
+## Netlify Deployment
+
+Heat is ready to deploy to Netlify as a Vite single-page app.
+
+Recommended site settings:
+
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Node version: `20`
+
+This repo already includes [netlify.toml](E:\websites\wum\netlify.toml) with:
+
+- SPA redirect handling so direct refreshes do not 404
+- no-cache headers for `index.html`, `sw.js`, and `site.webmanifest`
+- the correct build/publish settings
+
+Deployment flow:
+
+1. Push the current branch to GitHub.
+2. In Netlify, choose `Add new site` -> `Import an existing project`.
+3. Connect the GitHub repo that contains Heat.
+4. Confirm the detected settings match the values above.
+5. Deploy the site.
+
+After the first deploy:
+
+- open the live URL once in a normal browser tab
+- confirm the app loads the demo universe on a fresh profile
+- check the `Data` page for `Offline & App Status`
+- then test installability from the hosted URL rather than `localhost`
+
 ## Demo Universe
 
 Heat ships with a fully fictional demo universe in [public/demo-universe.json](E:\websites\wum\public\demo-universe.json).
