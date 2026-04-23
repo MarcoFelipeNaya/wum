@@ -370,7 +370,7 @@ export default function Data({
             )}
             <div className="data-note-row data-note-row--shell">
               <span className="data-note-label">PWA shell test marker:</span>
-              <span className="data-note-value">Heat local app shell v4.</span>
+              <span className="data-note-value">Heat version 1.0.0 — Opening Bell.</span>
             </div>
           </div>
         </section>
@@ -460,10 +460,12 @@ export default function Data({
 
         <section className="data-card">
           <div className="data-card-header">
-            <div className="data-card-heading">Best Practice</div>
+            <div className="data-card-heading">Privacy & Best Practice</div>
           </div>
 
           <div className="data-note-list">
+            <div className="data-note-row">Heat stores universe data locally in your current browser profile or installed app storage. Other people cannot access your save unless you explicitly export and share a backup.</div>
+            <div className="data-note-row">Using Heat on another browser, device, or profile creates a separate local universe unless you import the same backup there.</div>
             <div className="data-note-row">Export a fresh backup before large imports or major editing sessions.</div>
             <div className="data-note-row">Keep a few dated backups so you can roll back if needed.</div>
             <div className="data-note-row">Imports use the app&apos;s normalization and migration logic, so older backups stay usable.</div>

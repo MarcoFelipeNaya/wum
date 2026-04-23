@@ -48,6 +48,7 @@ Run the show. Build the legacy.
 - Rolling autosave snapshots with restore support
 - Full JSON export/import from the `Data` page
 - Hosted PWA support with offline/app status visibility
+- Saves stay local to the current browser/profile by default, so different users do not overlap unless they intentionally share backups
 
 ## Tech Stack
 
