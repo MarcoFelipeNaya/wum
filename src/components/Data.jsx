@@ -368,8 +368,9 @@ export default function Data({
                 A newer app shell is waiting. Use the update banner at the top of the app to refresh into the latest version.
               </div>
             )}
-            <div className="data-note-row">
-              PWA shell test marker: Heat local app shell v3.
+            <div className="data-note-row data-note-row--shell">
+              <span className="data-note-label">PWA shell test marker:</span>
+              <span className="data-note-value">Heat local app shell v4.</span>
             </div>
           </div>
         </section>

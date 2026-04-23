@@ -1,23 +1,77 @@
 # Heat: Wrestling Booker
 
-Heat is a local-first wrestling booking sandbox built with React and Vite.
-
-It is designed as a full universe management tool: book cards, track stories, manage championships, run tournaments, and protect long-running saves with recovery tools.
+Heat is a local-first wrestling booking sandbox for building shows, managing stories, tracking championships, running tournaments, and protecting long-running universes.
 
 Run the show. Build the legacy.
 
-## What Heat Includes
+## Live Project
+
+- Live app: [heatwb.netlify.app](https://heatwb.netlify.app)
+- Installable PWA: available from the hosted app
+- Demo universe: loads automatically on a fresh install with fully fictional data
+
+## What Makes Heat Stand Out
+
+- Mixed-card booking calendar with matches and story segments in the same running order
+- Singles, tag, and trios title ecosystems with lineage, reign history, and show branding
+- Story and rivalry management with tale-of-the-tape, active/concluded tracking, and segment support
+- Tournament brackets that book directly into the calendar
+- Rankings, records, accolades, match ratings, and dashboard analytics
+- Local-first persistence with IndexedDB, autosave recovery, export/import backups, and offline-ready PWA behavior
+
+## Feature Snapshot
+
+### Universe Management
 
 - Roster management for wrestlers and managers
-- Brand and special event management
-- A custom in-universe calendar with mixed match and segment cards
-- Story and rivalry tracking with segments and tale-of-the-tape
-- Singles, tag, and trios championships with lineage and history
-- Tournament brackets that book directly into the calendar
-- Rankings, records, accolades, and dashboard reporting
-- Import/export backups plus IndexedDB autosave recovery
-- A fictional demo universe that loads by default on a fresh install
-- Local PWA support for installable app behavior
+- Brands, weekly shows, and special events
+- Teams, trios, factions, and faction leaders
+- Fictional demo universe for portfolio/demo use
+
+### Booking & Storytelling
+
+- Match booking with singles, tag, trios, handicap, and tournament support
+- Story segments, standalone segments, stipulations, finish types, and match ratings
+- Mixed event-card ordering with drag/drop reordering
+- Same-day event support for weekly shows and specials
+
+### Competition Systems
+
+- Singles, tag, and trios championships
+- Rankings with PRS, win percentage, streak state, and sortable metrics
+- Records and accolades for both singles and teams
+- Tournament creation, bracket tracking, and calendar booking
+
+### Data Safety
+
+- Primary save state stored in IndexedDB
+- Rolling autosave snapshots with restore support
+- Full JSON export/import from the `Data` page
+- Hosted PWA support with offline/app status visibility
+
+## Tech Stack
+
+- React 18
+- Vite 5
+- Font Awesome
+- IndexedDB for primary persistence
+- Netlify for hosting
+- PWA manifest + custom service worker
+
+## Demo Universe
+
+Heat ships with a fully fictional demo universe in [public/demo-universe.json](E:\websites\wum\public\demo-universe.json).
+
+It includes:
+
+- 3 original brands
+- active champions and title history
+- teams, trios, factions, and managers
+- active and concluded stories
+- special events and tournaments
+- current and historical booking data
+
+If a user opens Heat with no existing local save, the app boots into this demo universe automatically.
 
 ## Local Development
 
@@ -45,7 +99,7 @@ The service worker does not register in `npm run dev`.
 
 ## Netlify Deployment
 
-Heat is ready to deploy to Netlify as a Vite single-page app.
+Heat is configured for Netlify as a Vite single-page app.
 
 Recommended site settings:
 
@@ -66,51 +120,6 @@ Deployment flow:
 3. Connect the GitHub repo that contains Heat.
 4. Confirm the detected settings match the values above.
 5. Deploy the site.
-
-After the first deploy:
-
-- open the live URL once in a normal browser tab
-- confirm the app loads the demo universe on a fresh profile
-- check the `Data` page for `Offline & App Status`
-- then test installability from the hosted URL rather than `localhost`
-
-## Demo Universe
-
-Heat ships with a fully fictional demo universe in [public/demo-universe.json](E:\websites\wum\public\demo-universe.json).
-
-It includes:
-
-- 3 original brands
-- active champions and lineage
-- teams, trios, factions, and managers
-- active and concluded stories
-- special events
-- tournament data
-- current and historical booking data
-
-If a user starts Heat with no existing local save, the app now boots into this demo universe by default.
-
-## Data Safety
-
-Heat is built around local-first save protection:
-
-- primary universe state is stored in IndexedDB
-- rolling autosave snapshots are kept for recovery
-- full JSON export/import is available from the `Data` page
-
-This makes the app safer for long-running personal universes and also easier to demo in a portfolio context.
-
-## PWA Status
-
-Heat includes a local PWA foundation:
-
-- manifest
-- custom service worker
-- install prompt handling
-- update-ready handling
-- offline/app status visibility in the `Data` page
-
-For local testing, use `npm run build` + `npm run preview`.
 
 ## Project Structure
 
@@ -148,6 +157,7 @@ src/
 
 public/
   demo-universe.json
+  og-cover.svg
   sw.js
   site.webmanifest
   favicon and install icons
@@ -159,4 +169,4 @@ Heat is positioned as a dramatic but polished booking desk for a wrestling unive
 
 - Visual language: ember orange, flame red, dark arena-night surfaces
 - Product voice: sharp, fast, wrestling-native
-- Portfolio angle: installable local app, persistent saves, demo-ready universe, and deep management systems
+- Portfolio angle: installable app, persistent saves, demo-ready universe, and deep management systems

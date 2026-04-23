@@ -193,6 +193,21 @@
   line-height: 1.5;
 }
 
+.data-note-row--shell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.data-note-label {
+  color: var(--text2);
+}
+
+.data-note-value {
+  color: var(--text);
+}
+
 .data-reset-meta {
   display: flex;
   align-items: center;
