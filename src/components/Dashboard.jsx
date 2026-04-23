@@ -224,8 +224,9 @@ export default function Dashboard({ state }) {
     <div className="dashboard-page">
       <section className="dashboard-hero">
         <div className="dashboard-hero-copy">
-          <div className="dashboard-kicker">Universe Control Center</div>
-          <h1 className="page-title">Universe Dashboard</h1>
+          <div className="dashboard-kicker">Heat: Wrestling Booker</div>
+          <h1 className="page-title">Run The Show. Build The Legacy. Control The Heat</h1>
+          <div className="dashboard-hero-tagline">The live booking desk for your wrestling universe.</div>
           <p className="dashboard-hero-subtle">
             {formatFullDate(currentDate)} is your current in-universe date, with {todayShows.length} show
             {todayShows.length !== 1 ? 's' : ''} scheduled, {activeStories.length} active stor
@@ -253,15 +254,39 @@ export default function Dashboard({ state }) {
 
         <div className="dashboard-hero-side">
           <div className="dashboard-side-card">
-            <div className="dashboard-side-heading">Today&apos;s Pulse</div>
+            <div className="dashboard-side-heading">Tonight&apos;s Heat</div>
             <div className="dashboard-side-value">{todayShows.length}</div>
-            <div className="dashboard-side-subtle">Shows on the calendar today</div>
+            <div className="dashboard-side-subtle">Shows on the board for the current date</div>
           </div>
           <div className="dashboard-side-card">
-            <div className="dashboard-side-heading">Segments Logged</div>
+            <div className="dashboard-side-heading">Story Sparks</div>
             <div className="dashboard-side-value">{standaloneSegments.length + stories.reduce((total, story) => total + (story.segments?.length || 0), 0)}</div>
-            <div className="dashboard-side-subtle">Standalone and story-linked segments</div>
+            <div className="dashboard-side-subtle">Segments and angles fueling the universe</div>
           </div>
+        </div>
+      </section>
+
+      <section className="dashboard-showcase">
+        <div className="dashboard-showcase-card">
+          <div className="dashboard-showcase-kicker">Book With Intent</div>
+          <h3 className="dashboard-showcase-title">One desk for cards, stories, and momentum.</h3>
+          <p className="dashboard-showcase-copy">
+            Build full show cards, track angles, and keep the entire universe moving without bouncing between disconnected tools.
+          </p>
+        </div>
+        <div className="dashboard-showcase-card">
+          <div className="dashboard-showcase-kicker">Brand The Universe</div>
+          <h3 className="dashboard-showcase-title">Shows, specials, factions, tournaments, and gold all stay connected.</h3>
+          <p className="dashboard-showcase-copy">
+            Heat is built to manage branded promotions, big event identity, title scenes, and faction ecosystems in one place.
+          </p>
+        </div>
+        <div className="dashboard-showcase-card">
+          <div className="dashboard-showcase-kicker">Protect The Save</div>
+          <h3 className="dashboard-showcase-title">Your universe keeps its history.</h3>
+          <p className="dashboard-showcase-copy">
+            IndexedDB persistence, recovery snapshots, and import/export backups keep long-running universes safer as they grow.
+          </p>
         </div>
       </section>
 

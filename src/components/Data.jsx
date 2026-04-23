@@ -33,6 +33,7 @@ export default function Data({
 }) {
   const fileInputRef = useRef(null)
   const [isImporting, setIsImporting] = useState(false)
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false)
   const [restoringSnapshotId, setRestoringSnapshotId] = useState(null)
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false)
 
@@ -76,12 +77,30 @@ export default function Data({
     try {
       setIsImporting(true)
       const text = await file.text()
-      importData(text)
+      await importData(text)
       showToast('Backup imported')
     } catch (error) {
       showToast(error?.message || 'Could not import backup')
     } finally {
       setIsImporting(false)
+    }
+  }
+
+  const handleLoadDemoUniverse = async () => {
+    const confirmed = window.confirm('Load the Heat demo universe? This will replace the current local save unless you export a backup first.')
+    if (!confirmed) return
+
+    try {
+      setIsLoadingDemo(true)
+      const response = await fetch('/demo-universe.json', { cache: 'no-store' })
+      if (!response.ok) throw new Error('Could not load demo universe')
+      const text = await response.text()
+      await importData(text)
+      showToast('Demo universe loaded')
+    } catch (error) {
+      showToast(error?.message || 'Could not load demo universe')
+    } finally {
+      setIsLoadingDemo(false)
     }
   }
 
@@ -215,6 +234,21 @@ export default function Data({
                 onChange={handleImportFile}
                 hidden
               />
+            </div>
+
+            <div className="data-action-card data-action-card--demo">
+              <div className="data-action-title">Load Demo Universe</div>
+              <div className="data-action-copy">
+                Imports a curated fictional Heat universe with active shows, titles, stories, special events, teams, factions, and tournaments so you can test real import behavior safely.
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleLoadDemoUniverse}
+                disabled={isLoadingDemo}
+              >
+                {isLoadingDemo ? 'Loading Demo...' : 'Load Demo Data'}
+              </button>
             </div>
           </div>
         </section>

@@ -27,10 +27,16 @@ export default function App() {
     return (
       <div className="app">
         <main className="app-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-          <div className="card" style={{ maxWidth: 420, textAlign: 'center' }}>
-            <h1 className="page-title" style={{ marginBottom: 8 }}>Loading Universe</h1>
+          <div className="card" style={{ maxWidth: 480, textAlign: 'center', padding: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.8, textTransform: 'uppercase', color: 'var(--primary-light)', marginBottom: 10 }}>
+              Heat: Wrestling Booker
+            </div>
+            <h1 className="page-title" style={{ marginBottom: 8 }}>Loading The Show</h1>
             <p style={{ color: 'var(--text2)', margin: 0 }}>
               Restoring your saved data and autosaves from local storage and IndexedDB.
+            </p>
+            <p style={{ color: 'var(--text3)', margin: '10px 0 0', fontSize: 12 }}>
+              Run the show. Build the legacy.
             </p>
           </div>
         </main>

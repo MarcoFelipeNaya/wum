@@ -97,7 +97,7 @@
 
 .data-action-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
 }
 
@@ -115,6 +115,14 @@
   border-radius: var(--radius);
   border: 1px solid var(--border2);
   background: var(--bg3);
+}
+
+.data-action-card--demo {
+  background:
+    radial-gradient(circle at top right, rgba(255, 136, 58, 0.12), transparent 52%),
+    linear-gradient(180deg, rgba(255, 98, 54, 0.08), rgba(255, 98, 54, 0.02)),
+    var(--bg3);
+  border-color: rgba(255, 131, 58, 0.28);
 }
 
 .data-action-title {
@@ -234,10 +242,6 @@
 }
 
 @media (max-width: 768px) {
-  .data-action-grid {
-    grid-template-columns: 1fr;
-  }
-
   .data-status-row {
     grid-template-columns: 1fr;
   }

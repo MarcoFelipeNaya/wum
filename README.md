@@ -2,6 +2,8 @@
 
 A React app to book and manage a wrestling universe with roster control, branded shows, calendar booking, stories, tournaments, and championships.
 
+Run the show. Build the legacy.
+
 ## Setup
 
 ```bash
@@ -51,3 +53,9 @@ src/
 - Story and rivalry tracking with segments and tale-of-the-tape
 - Tournament brackets that book directly to the calendar
 - IndexedDB-backed saves with export/import and autosave recovery
+
+## Brand Direction
+
+- `Heat` is positioned as the live booking desk for a wrestling universe
+- Visual identity centers on ember orange, flame red, and a dark arena-night backdrop
+- Tone aims for dramatic but product-polished: fast, sharp, and wrestling-native
