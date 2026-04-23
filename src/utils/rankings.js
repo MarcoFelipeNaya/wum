@@ -1,4 +1,7 @@
 function getMatchResultForWrestler(match, wrestlerId) {
+  const participantIds = getParticipantIds(match)
+  if (!participantIds.includes(wrestlerId)) return 'pending'
+  if (String(match?.finishType || '').trim().toLowerCase() === 'no contest') return 'draw'
   if (!match?.winnerId) return 'pending'
   if (match.winnerId === wrestlerId) return 'win'
   return 'loss'

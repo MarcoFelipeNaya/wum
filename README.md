@@ -1,6 +1,6 @@
-# Wrestling Universe Manager
+# Heat: Wrestling Booker
 
-A React app to manage your wrestling universe with roster, shows, calendar, and championships.
+A React app to book and manage a wrestling universe with roster control, branded shows, calendar booking, stories, tournaments, and championships.
 
 ## Setup
 
@@ -43,16 +43,11 @@ src/
 
 ## Features
 
-- Roster: add/edit wrestlers with name, show, alignment, and win/loss record
-- Shows & Brands: create weekly shows with custom color and day
-- Calendar: 4-week rolling calendar, book matches per day, set winners
-- Championships: create titles, assign champions, track history
-- Dashboard: live stats, recent matches, current champions
-
-## Coming next
-
-- Tag teams and stables
-- Stories and rivalries
-- Tournament bracket builder
-- Simulate button
-- Local storage persistence
+- Dashboard with champions, live universe stats, ratings, and current card visibility
+- Roster management for wrestlers and managers
+- Shows, special events, factions, teams, and trios
+- Calendar booking with mixed match/segment cards, drag reorder, stories, and results
+- Championships with lineage, modal detail views, and tag/trios support
+- Story and rivalry tracking with segments and tale-of-the-tape
+- Tournament brackets that book directly to the calendar
+- IndexedDB-backed saves with export/import and autosave recovery

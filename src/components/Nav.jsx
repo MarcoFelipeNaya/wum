@@ -8,6 +8,7 @@ const PAGES = [
   { id: 'factions', label: 'Factions' },
   { id: 'shows', label: 'Shows' },
   { id: 'rankings', label: 'Rankings'},
+  { id: 'records', label: 'Records' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'tournaments', label: 'Tournaments' },
   { id: 'titles', label: 'Titles' },
@@ -20,9 +21,9 @@ export default function Nav({ current, onNavigate }) {
     <nav className="nav">
       <div className="nav-brand">
         <span className="nav-brand-icon">
-          <img src="/wum-mark.svg" alt="WUM logo" />
+          <img src="/heat-logo-trans.png" alt="Heat logo" />
         </span>
-        <span className="nav-brand-text">WUM</span>
+        <span className="nav-brand-text">Heat</span>
       </div>
       <div className="nav-links">
         {PAGES.map((p) => (

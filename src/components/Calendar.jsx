@@ -64,12 +64,13 @@ export default function Calendar({
   advanceDay,
   setStartDate,
   moveDayCardItem,
+  reorderDayCardItem,
   addSegment,      // ← new: from useStore
   deleteSegment,   // ← new: from useStore
   showToast,
 }) {
   const updateSegmentFn = arguments[0].updateSegment
-  const { shows, wrestlers, matches, titles, stories = [], standaloneSegments = [], currentDate, specialShows = [], teams = [] } = state
+  const { shows, wrestlers, matches, titles, stories = [], standaloneSegments = [], currentDate, specialShows = [], teams = [], factions = [] } = state
 
   const safeCurrentDate =
     currentDate && currentDate.match(/^\d{4}-\d{2}-\d{2}$/) ? currentDate : todayStr()
@@ -100,6 +101,12 @@ export default function Calendar({
   const goToNextMonth = () => {
     if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1) }
     else setViewMonth((m) => m + 1)
+  }
+
+  const jumpToCurrentMonth = () => {
+    const parts = parseParts(safeCurrentDate)
+    setViewYear(parts.year)
+    setViewMonth(parts.monthIndex)
   }
 
   const cells = useMemo(
@@ -142,9 +149,43 @@ export default function Calendar({
     return false
   }
 
+  const getSegmentsOnDate = (dateStr) => {
+    const result = []
+    for (const story of stories) {
+      for (let i = 0; i < (story.segments || []).length; i++) {
+        const seg = story.segments[i]
+        if (seg.date === dateStr) {
+          result.push({ ...seg, storyId: story.id, storyName: story.name, segmentIndex: i })
+        }
+      }
+    }
+    for (let i = 0; i < standaloneSegments.length; i += 1) {
+      const seg = standaloneSegments[i]
+      if (seg.date === dateStr) {
+        result.push({ ...seg, storyId: null, storyName: null, segmentIndex: i, standalone: true })
+      }
+    }
+    return result
+  }
+
   const currentShowMatches = matches.filter((m) => m.date === safeCurrentDate)
+  const currentShowSegments = useMemo(() => getSegmentsOnDate(safeCurrentDate), [stories, standaloneSegments, safeCurrentDate])
+  const visibleMonthStats = useMemo(() => {
+    const monthDates = Array.from({ length: DAYS_PER_MONTH }, (_, i) => makeDateStr(viewYear, viewMonth, i + 1))
+    return monthDates.reduce((acc, dateStr) => {
+      const dayShows = showsOnDate(dateStr)
+      const dayMatches = matches.filter((match) => match.date === dateStr)
+      const daySegments = getSegmentsOnDate(dateStr)
+      acc.showDays += dayShows.length > 0 ? 1 : 0
+      acc.matches += dayMatches.length
+      acc.segments += daySegments.length
+      acc.specials += dayShows.filter((show) => show.kind === 'special').length
+      return acc
+    }, { showDays: 0, matches: 0, segments: 0, specials: 0 })
+  }, [viewYear, viewMonth, matches, shows, specialShows, stories, standaloneSegments])
+  const currentDayShows = showsOnDate(safeCurrentDate)
   const canAdvance =
-    showsOnDate(safeCurrentDate).length > 0 &&
+    currentDayShows.length > 0 &&
     currentShowMatches.length > 0 &&
     currentShowMatches.every((m) => m.winnerId != null)
 
@@ -153,14 +194,14 @@ export default function Calendar({
     setDayModal(dateStr)
   }
 
-  const handleBookMatch = (date, participantIds, titleId, mode, notes, stipulation) => {
+  const handleBookMatch = (date, participantIds, titleId, mode, notes, stipulation, extra = {}) => {
     const competitiveIds = new Set(wrestlers.filter((w) => (w.role || 'wrestler') === 'wrestler').map((w) => w.id))
     const safeParticipants = [...new Set((participantIds || []).filter((id) => competitiveIds.has(id)))]
     if (![2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30].includes(safeParticipants.length)) {
       showToast('Participants must be 2 to 10, or 20 / 30 for Royal Rumble')
       return
     }
-    bookMatch(date, safeParticipants, titleId, mode, notes, stipulation)
+    bookMatch(date, safeParticipants, titleId, mode, notes, stipulation, extra)
     showToast('Match booked!')
   }
 
@@ -180,8 +221,8 @@ export default function Calendar({
     showToast('Match deleted')
   }
 
-  const handleSetWinner = (matchId, winnerId) => {
-    setWinner(matchId, winnerId)
+  const handleSetWinner = (matchId, winnerId, finishType) => {
+    setWinner(matchId, winnerId, finishType)
     showToast(`${getW(winnerId)?.name ?? '?'} wins!`)
   }
 
@@ -203,29 +244,6 @@ export default function Calendar({
     setShowStartPicker(false)
     setDayModal(null)
     showToast(`Calendar start set to ${MONTHS_FULL[startMonth]} ${startYear}`)
-  }
-
-  /**
-   * Collect all segments across all stories that are dated on a given day.
-   * Each segment gets storyId + storyName attached so we can delete it later.
-   */
-  const getSegmentsOnDate = (dateStr) => {
-    const result = []
-    for (const story of stories) {
-      for (let i = 0; i < (story.segments || []).length; i++) {
-        const seg = story.segments[i]
-        if (seg.date === dateStr) {
-          result.push({ ...seg, storyId: story.id, storyName: story.name, segmentIndex: i })
-        }
-      }
-    }
-    for (let i = 0; i < standaloneSegments.length; i += 1) {
-      const seg = standaloneSegments[i]
-      if (seg.date === dateStr) {
-        result.push({ ...seg, storyId: null, storyName: null, segmentIndex: i, standalone: true })
-      }
-    }
-    return result
   }
 
   /**
@@ -302,30 +320,37 @@ export default function Calendar({
     if (moveDayCardItem) moveDayCardItem(date, item, direction)
   }
 
+  const handleReorderDayCardItem = (date, draggedItem, targetItem) => {
+    if (reorderDayCardItem) reorderDayCardItem(date, draggedItem, targetItem)
+  }
+
   const monthLabel = `${(MONTHS_FULL || MONTHS)[viewMonth]} ${viewYear}`
 
   return (
     <div className="calendar-page">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          marginBottom: 16,
-          flexWrap: 'wrap',
-          gap: 12,
-        }}
-      >
-        <div>
+      <div className="calendar-hero">
+        <div className="calendar-hero-copy">
           <h1 className="page-title">Calendar</h1>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 3 }}>
-            Current show: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{safeCurrentDate}</span>
+          <div className="calendar-hero-date">
+            Current show day: <span>{safeCurrentDate}</span>
+          </div>
+          <div className="calendar-live-row">
+            {currentDayShows.length > 0 ? currentDayShows.map((show) => (
+              <span key={`${show.kind}-${show.id}`} className="calendar-live-chip" style={{ borderColor: `${show.color}55`, color: show.color, background: `${show.color}18` }}>
+                {show.kind === 'special' ? `${show.name} Special` : show.name}
+              </span>
+            )) : (
+              <span className="calendar-live-empty">No active show on this date yet</span>
+            )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="calendar-hero-actions">
           <button className="btn btn-secondary" type="button" onClick={() => setShowStartPicker((v) => !v)}>
             Set Start Date
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={jumpToCurrentMonth}>
+            Jump To Current
           </button>
           <button
             className={`btn btn-primary advance-btn${canAdvance ? ' ready' : ''}`}
@@ -338,32 +363,43 @@ export default function Calendar({
         </div>
       </div>
 
+      <div className="calendar-overview">
+        <div className="calendar-overview-card">
+          <div className="calendar-overview-label">This Month</div>
+          <div className="calendar-overview-value">{monthLabel}</div>
+          <div className="calendar-overview-meta">{visibleMonthStats.showDays} show days scheduled</div>
+        </div>
+        <div className="calendar-overview-card">
+          <div className="calendar-overview-label">Booked Matches</div>
+          <div className="calendar-overview-value">{visibleMonthStats.matches}</div>
+          <div className="calendar-overview-meta">{visibleMonthStats.segments} segments in the month</div>
+        </div>
+        <div className="calendar-overview-card">
+          <div className="calendar-overview-label">Current Card</div>
+          <div className="calendar-overview-value">{currentShowMatches.length + currentShowSegments.length}</div>
+          <div className="calendar-overview-meta">{currentShowMatches.length} matches, {currentShowSegments.length} segments</div>
+        </div>
+        <div className="calendar-overview-card">
+          <div className="calendar-overview-label">Special Events</div>
+          <div className="calendar-overview-value">{visibleMonthStats.specials}</div>
+          <div className="calendar-overview-meta">Across the visible month</div>
+        </div>
+      </div>
+
+      <div className="calendar-legend">
+        <span className="calendar-legend-title">Legend</span>
+        <span className="calendar-legend-pill legend-live">Live</span>
+        <span className="calendar-legend-pill legend-done">Completed</span>
+        <span className="calendar-legend-pill legend-special">Special Event</span>
+        <span className="calendar-legend-pill legend-chip">M / S / T chips = Matches / Segments / Title Matches</span>
+      </div>
+
       {showStartPicker && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            marginBottom: 16,
-            padding: 12,
-            background: 'var(--bg2)',
-            border: '1px solid var(--border2)',
-            borderRadius: 'var(--radius)',
-          }}
-        >
+        <div className="calendar-start-picker">
           <select
             value={startMonth}
             onChange={(e) => setStartMonth(parseInt(e.target.value, 10))}
-            style={{
-              background: 'var(--bg3)',
-              border: '1px solid var(--border2)',
-              color: 'var(--text)',
-              padding: '8px 10px',
-              borderRadius: 'var(--radius)',
-              fontSize: 13,
-              minWidth: 160,
-            }}
+            className="calendar-start-select"
           >
             {MONTHS_FULL.map((monthName, index) => (
               <option key={monthName} value={index}>{monthName}</option>
@@ -374,15 +410,7 @@ export default function Calendar({
             type="number"
             value={startYear}
             onChange={(e) => setStartYear(parseInt(e.target.value || '2026', 10))}
-            style={{
-              background: 'var(--bg3)',
-              border: '1px solid var(--border2)',
-              color: 'var(--text)',
-              padding: '8px 10px',
-              borderRadius: 'var(--radius)',
-              fontSize: 13,
-              width: 120,
-            }}
+            className="calendar-start-year"
           />
 
           <button className="btn btn-primary" type="button" onClick={handleApplyStartDate}>Apply</button>
@@ -390,12 +418,15 @@ export default function Calendar({
         </div>
       )}
 
+      <div className="cal-nav-shell">
       <div className="cal-nav">
         <button className="btn btn-secondary btn-sm" onClick={goToPrevMonth}>Previous Month</button>
         <div className="cal-range">{monthLabel}</div>
         <button className="btn btn-secondary btn-sm" onClick={goToNextMonth}>Next Month</button>
       </div>
+      </div>
 
+      <div className="calendar-grid-shell">
       <div className="day-headers">
         {DAY_SHORT.map((d) => (
           <div key={d} className="day-header">{d}</div>
@@ -407,6 +438,8 @@ export default function Calendar({
           const dayShows = showsOnDate(dateStr)
           const dayMatches = matches.filter((m) => m.date === dateStr)
           const daySegs = getSegmentsOnDate(dateStr)
+          const titleMatchCount = dayMatches.filter((m) => m.titleId).length
+          const specialCount = dayShows.filter((show) => show.kind === 'special').length
           const locked = isLocked(dateStr)
           const isCurrent = isCurrentShowDay(dateStr)
           const isDone =
@@ -443,9 +476,18 @@ export default function Calendar({
                   {daySegs.length > 0 && `${daySegs.length} seg${daySegs.length > 1 ? 's' : ''}`}
                 </div>
               )}
+              {(dayMatches.length > 0 || daySegs.length > 0 || titleMatchCount > 0 || specialCount > 0) && (
+                <div className="cal-summary-chips">
+                  {dayMatches.length > 0 && <span className="cal-summary-chip">{dayMatches.length}M</span>}
+                  {daySegs.length > 0 && <span className="cal-summary-chip">{daySegs.length}S</span>}
+                  {titleMatchCount > 0 && <span className="cal-summary-chip cal-summary-chip-gold">{titleMatchCount}T</span>}
+                  {specialCount > 0 && <span className="cal-summary-chip cal-summary-chip-special">Event</span>}
+                </div>
+              )}
             </div>
           )
         })}
+      </div>
       </div>
 
       {dayModal && (
@@ -455,6 +497,7 @@ export default function Calendar({
           wrestlers={wrestlers}
           stories={stories}
           teams={teams}
+          factions={factions}
           showToast={showToast}
           dayShows={showsOnDate(dayModal)}
           dayMatches={matches.filter((m) => m.date === dayModal)}
@@ -476,6 +519,7 @@ export default function Calendar({
           onUpdateSegment={handleUpdateSegment}
           onDeleteSegment={handleDeleteSegment}
           onMoveDayCardItem={handleMoveDayCardItem}
+          onReorderDayCardItem={handleReorderDayCardItem}
         />
       )}
     </div>

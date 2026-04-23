@@ -86,6 +86,10 @@ function isCompetitiveRole(person) {
   return normalizeRosterRole(person?.role) === 'wrestler'
 }
 
+function normalizeStatValue(value) {
+  return Math.max(0, parseInt(value, 10) || 0)
+}
+
 function pruneStoriesByParticipantType(stories = [], removedType) {
   return (stories || [])
     .map((story) => ({
@@ -109,6 +113,84 @@ function getNextCardOrderForDate(date, matches = [], stories = [], standaloneSeg
   const existingOrders = [...matchOrders, ...segmentOrders, ...standaloneOrders]
   if (existingOrders.length === 0) return 1
   return Math.min(...existingOrders) - 1
+}
+
+function getValidCardOrder(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function buildDayCardEntries(state, date) {
+  const safeDate = fmt(date)
+  const dayMatches = state.matches
+    .filter((match) => fmt(match.date) === safeDate)
+    .map((match, index) => ({
+      kind: 'match',
+      key: `match:${match.id}`,
+      id: match.id,
+      effectiveOrder: getValidCardOrder(match.cardOrder) ?? index + 1,
+    }))
+
+  const dayStorySegments = state.stories.flatMap((story) =>
+    (story.segments || [])
+      .map((segment, index) => ({
+        kind: 'segment',
+        key: `segment:${segment.id ?? `${story.id}:${index}`}`,
+        storyId: story.id,
+        segmentId: segment.id,
+        segmentIndex: index,
+        date: fmt(segment.date),
+        effectiveOrder: getValidCardOrder(segment.cardOrder) ?? dayMatches.length + index + 1,
+      }))
+      .filter((segment) => segment.date === safeDate)
+  )
+
+  const dayStandaloneSegments = (state.standaloneSegments || [])
+    .filter((segment) => fmt(segment.date) === safeDate)
+    .map((segment, index) => ({
+      kind: 'segment',
+      key: `segment:${segment.id ?? `standalone:${index}`}`,
+      storyId: null,
+      segmentId: segment.id,
+      segmentIndex: index,
+      effectiveOrder: getValidCardOrder(segment.cardOrder) ?? dayMatches.length + dayStorySegments.length + index + 1,
+    }))
+
+  return [...dayMatches, ...dayStorySegments, ...dayStandaloneSegments]
+    .sort((a, b) => a.effectiveOrder - b.effectiveOrder)
+}
+
+function applyDayCardOrder(state, date, orderedEntries) {
+  const safeDate = fmt(date)
+  const nextOrderMap = new Map(
+    orderedEntries.map((entry, index) => [entry.key, index + 1])
+  )
+
+  state.matches = state.matches.map((match) => {
+    if (fmt(match.date) !== safeDate) return match
+    const nextOrder = nextOrderMap.get(`match:${match.id}`)
+    return nextOrder ? { ...match, cardOrder: nextOrder } : match
+  })
+
+  state.stories = state.stories.map((story) => ({
+    ...story,
+    segments: (story.segments || []).map((segment, index) => {
+      if (fmt(segment.date) !== safeDate) return segment
+      const nextOrder = nextOrderMap.get(`segment:${segment.id ?? `${story.id}:${index}`}`)
+      return nextOrder ? { ...segment, cardOrder: nextOrder } : segment
+    }),
+  }))
+
+  state.standaloneSegments = (state.standaloneSegments || []).map((segment, index) => {
+    if (fmt(segment.date) !== safeDate) return segment
+    const nextOrder = nextOrderMap.get(`segment:${segment.id ?? `standalone:${index}`}`)
+    return nextOrder ? { ...segment, cardOrder: nextOrder } : segment
+  })
+}
+
+function prependDayCardEntry(state, date, entryKey) {
+  const existingEntries = buildDayCardEntries(state, date).filter((entry) => entry.key !== entryKey)
+  applyDayCardOrder(state, date, [{ key: entryKey }, ...existingEntries])
 }
 
 function getParticipantIds(match) {
@@ -202,6 +284,41 @@ function getWinningIds(match, winnerId) {
 
   if (participantIds.includes(winnerId)) return [winnerId]
   return []
+}
+
+function getParticipantResult(match, wrestlerId, winnerId = match?.winnerId, finishType = match?.finishType) {
+  const participantIds = getParticipantIds(match)
+  if (!participantIds.includes(wrestlerId)) return 'pending'
+  if (String(finishType || '').trim().toLowerCase() === 'no contest') return 'draw'
+
+  const winningIds = getWinningIds(match, winnerId)
+  if (winningIds.length === 0) return 'pending'
+  return winningIds.includes(wrestlerId) ? 'win' : 'loss'
+}
+
+function calculateWrestlerStreak(matches = [], wrestlerId) {
+  const relevantMatches = [...(matches || [])]
+    .filter((match) => {
+      const result = getParticipantResult(match, wrestlerId)
+      return result !== 'pending'
+    })
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+
+  let streak = 0
+  for (let i = relevantMatches.length - 1; i >= 0; i -= 1) {
+    const result = getParticipantResult(relevantMatches[i], wrestlerId)
+    if (result === 'draw') return 0
+    if (result === 'win') {
+      if (streak < 0) break
+      streak += 1
+      continue
+    }
+    if (result === 'loss') {
+      if (streak > 0) break
+      streak -= 1
+    }
+  }
+  return streak
 }
 
 function getTitleChampIds(title) {
@@ -376,6 +493,10 @@ function normalizeStoredState(rawState) {
   parsed.wrestlers = (parsed.wrestlers || INITIAL_STATE.wrestlers).map((wrestler) => ({
     ...wrestler,
     role: normalizeRosterRole(wrestler.role),
+    wins: normalizeStatValue(wrestler.wins),
+    losses: normalizeStatValue(wrestler.losses),
+    draws: normalizeStatValue(wrestler.draws),
+    streak: parseInt(wrestler.streak, 10) || 0,
   }))
   parsed.titles = parsed.titles || INITIAL_STATE.titles
   parsed.factions = parsed.factions || []
@@ -401,6 +522,8 @@ function normalizeStoredState(rawState) {
       matchType: m.matchType || getMatchType(participantIds, mode),
       notes: m.notes || '',
       stipulation: m.stipulation || '',
+      finishType: m.finishType || '',
+      storyId: parseInt(m.storyId, 10) || null,
       rating: m.rating == null ? null : Math.max(0.5, Math.min(5, Math.round(Number(m.rating) * 2) / 2)),
       cardOrder: Number(m.cardOrder) || 0,
       tournamentId: parseInt(m.tournamentId, 10) || null,
@@ -625,9 +748,10 @@ export function useStore() {
   const createMatchRecord = (s, date, participantIds, titleId = null, mode = 'free_for_all', notes = '', stipulation = '', extra = {}) => {
     const safeDate = fmt(date)
     const safeMode = normalizeMode(participantIds.length, mode)
+    const id = genId(s)
 
     return {
-      id: genId(s),
+      id,
       date: safeDate,
       participantIds,
       winnerId: null,
@@ -636,8 +760,10 @@ export function useStore() {
       matchType: getMatchType(participantIds, safeMode),
       notes: (notes || '').trim(),
       stipulation: (stipulation || '').trim(),
+      finishType: '',
+      storyId: extra.storyId ?? null,
       rating: extra.rating == null ? null : Math.max(0.5, Math.min(5, Math.round(Number(extra.rating) * 2) / 2)),
-      cardOrder: getNextCardOrderForDate(safeDate, s.matches, s.stories, s.standaloneSegments),
+      cardOrder: 1,
       tournamentId: extra.tournamentId ?? null,
       tournamentRoundIndex: Number.isInteger(extra.tournamentRoundIndex) ? extra.tournamentRoundIndex : null,
       tournamentMatchId: extra.tournamentMatchId ?? null,
@@ -653,12 +779,24 @@ export function useStore() {
   }
 
   const addWrestler = (data) => update((s) => {
-    s.wrestlers = [...s.wrestlers, { id: genId(s), wins: 0, losses: 0, role: normalizeRosterRole(data.role), ...data }]
+    s.wrestlers = [...s.wrestlers, { id: genId(s), wins: 0, losses: 0, draws: 0, streak: 0, role: normalizeRosterRole(data.role), ...data }]
     return s
   })
 
   const editWrestler = (id, data) => update((s) => {
-    s.wrestlers = s.wrestlers.map((w) => (w.id === id ? { ...w, ...data, role: normalizeRosterRole(data.role ?? w.role) } : w))
+    s.wrestlers = s.wrestlers.map((w) => {
+      if (w.id !== id) return w
+      const nextRole = normalizeRosterRole(data.role ?? w.role)
+      return {
+        ...w,
+        ...data,
+        role: nextRole,
+        wins: nextRole === 'wrestler' ? normalizeStatValue(data.wins ?? w.wins) : 0,
+        losses: nextRole === 'wrestler' ? normalizeStatValue(data.losses ?? w.losses) : 0,
+        draws: nextRole === 'wrestler' ? normalizeStatValue(data.draws ?? w.draws) : 0,
+        streak: nextRole === 'wrestler' ? parseInt(data.streak ?? w.streak, 10) || 0 : 0,
+      }
+    })
     return s
   })
 
@@ -866,7 +1004,9 @@ export function useStore() {
 
     if (!ALLOWED_PARTICIPANT_COUNTS.includes(safeParticipants.length)) return s
 
-    s.matches = [...s.matches, createMatchRecord(s, date, safeParticipants, titleId, mode, notes, stipulation, extra)]
+    const matchRecord = createMatchRecord(s, date, safeParticipants, titleId, mode, notes, stipulation, extra)
+    s.matches = [...s.matches, matchRecord]
+    prependDayCardEntry(s, date, `match:${matchRecord.id}`)
     return s
   })
 
@@ -898,6 +1038,7 @@ export function useStore() {
     )
 
     s.matches = [...s.matches, matchRecord]
+    prependDayCardEntry(s, date, `match:${matchRecord.id}`)
     s.tournaments = (s.tournaments || []).map((item) => (
       item.id !== tournamentId
         ? item
@@ -930,6 +1071,7 @@ export function useStore() {
               ...m,
               notes: (data.notes ?? m.notes ?? '').trim(),
               stipulation: (data.stipulation ?? m.stipulation ?? '').trim(),
+              storyId: data.storyId ?? m.storyId ?? null,
             }
           : m
       )
@@ -952,6 +1094,7 @@ export function useStore() {
             matchType: getMatchType(safeParticipants, safeMode),
             notes: (data.notes ?? m.notes ?? '').trim(),
             stipulation: (data.stipulation ?? m.stipulation ?? '').trim(),
+            storyId: data.storyId ?? m.storyId ?? null,
           }
         : m
     )
@@ -997,31 +1140,43 @@ export function useStore() {
     return s
   })
 
-  const setWinner = (matchId, winnerId) => update((s) => {
+  const setWinner = (matchId, winnerId, finishType = '') => update((s) => {
     const match = s.matches.find((m) => m.id === matchId)
     if (!match) return s
+    const safeFinishType = String(finishType || '').trim()
+    if (!safeFinishType) return s
 
     const participantIds = getParticipantIds(match)
-    const prevWinnerIds = getWinningIds(match, match.winnerId)
-    const newWinnerIds = getWinningIds(match, winnerId)
-
-    s.matches = s.matches.map((m) => (m.id === matchId ? { ...m, winnerId } : m))
+    const isNoContest = safeFinishType.toLowerCase() === 'no contest'
+    const newWinnerIds = isNoContest ? [] : getWinningIds(match, winnerId)
+    const nextMatches = s.matches.map((m) => (m.id === matchId ? { ...m, winnerId, finishType: safeFinishType } : m))
+    s.matches = nextMatches
 
     s.wrestlers = s.wrestlers.map((w) => {
-      let { wins, losses } = w
+      let wins = normalizeStatValue(w.wins)
+      let losses = normalizeStatValue(w.losses)
+      let draws = normalizeStatValue(w.draws)
 
-      if (prevWinnerIds.length > 0) {
-        if (prevWinnerIds.includes(w.id)) wins = Math.max(0, wins - 1)
-        else if (participantIds.includes(w.id)) losses = Math.max(0, losses - 1)
+      const previousResult = getParticipantResult(match, w.id, match.winnerId, match.finishType)
+      if (previousResult === 'win') wins = Math.max(0, wins - 1)
+      if (previousResult === 'loss') losses = Math.max(0, losses - 1)
+      if (previousResult === 'draw') draws = Math.max(0, draws - 1)
+
+      const nextResult = getParticipantResult({ ...match, winnerId, finishType: safeFinishType }, w.id, winnerId, safeFinishType)
+      if (nextResult === 'win') wins += 1
+      if (nextResult === 'loss') losses += 1
+      if (nextResult === 'draw') draws += 1
+
+      return {
+        ...w,
+        wins,
+        losses,
+        draws,
+        streak: calculateWrestlerStreak(nextMatches, w.id),
       }
-
-      if (newWinnerIds.includes(w.id)) wins += 1
-      else if (participantIds.includes(w.id)) losses += 1
-
-      return { ...w, wins, losses }
     })
 
-    if (match.titleId) {
+    if (match.titleId && !isNoContest) {
       s.titles = s.titles.map((t) => {
         if (t.id !== match.titleId) return t
 
@@ -1073,7 +1228,9 @@ export function useStore() {
 
         const sideA = getTournamentEntry(tournament, fixture.sideAEntryId)
         const sideB = getTournamentEntry(tournament, fixture.sideBEntryId)
-        const winnerEntryId = [sideA, sideB].find((entry) => entry?.participantIds?.includes(winnerId))?.id ?? null
+        const winnerEntryId = isNoContest
+          ? null
+          : ([sideA, sideB].find((entry) => entry?.participantIds?.includes(winnerId))?.id ?? null)
 
         const nextTournament = {
           ...tournament,
@@ -1172,6 +1329,7 @@ export function useStore() {
 
   const deleteStory = (id) => update((s) => {
     s.stories = s.stories.filter((story) => story.id !== id)
+    s.matches = s.matches.map((match) => (match.storyId === id ? { ...match, storyId: null } : match))
     return s
   })
 
@@ -1189,19 +1347,21 @@ export function useStore() {
    * }
    */
   const addSegment = (storyId, segment) => update((s) => {
+    const segmentDate = segment.date || s.currentDate
     const normalized = {
       id: genId(s),
-      date: segment.date || s.currentDate,
+      date: segmentDate,
       title: segment.title || segment.type || 'Segment',
       description: segment.description || '',
       segmentType: segment.segmentType || segment.type || null,
       wrestlerIds: normalizeParticipantIds(segment.wrestlerIds || []),
       matchId: segment.matchId || null,
-      cardOrder: getNextCardOrderForDate(segment.date || s.currentDate, s.matches, s.stories, s.standaloneSegments),
+      cardOrder: 1,
     }
 
     if (!storyId) {
       s.standaloneSegments = [...(s.standaloneSegments || []), normalized]
+      prependDayCardEntry(s, segmentDate, `segment:${normalized.id}`)
       return s
     }
 
@@ -1212,6 +1372,7 @@ export function useStore() {
         segments: [...(story.segments || []), normalized],
       }
     })
+    prependDayCardEntry(s, segmentDate, `segment:${normalized.id}`)
     return s
   })
 
@@ -1264,49 +1425,7 @@ export function useStore() {
   })
 
   const moveDayCardItem = (date, item, direction) => update((s) => {
-    const safeDate = fmt(date)
-    const dayMatches = s.matches
-      .filter((match) => fmt(match.date) === safeDate)
-      .map((match, index) => ({
-        kind: 'match',
-        id: match.id,
-        cardOrder: Number(match.cardOrder) || 0,
-        fallbackOrder: index + 1,
-      }))
-    const daySegments = s.stories.flatMap((story) =>
-      (story.segments || [])
-        .map((segment, index) => ({
-          kind: 'segment',
-          storyId: story.id,
-          segmentIndex: index,
-          segmentId: segment.id,
-          date: fmt(segment.date),
-          cardOrder: Number(segment.cardOrder) || 0,
-          fallbackOrder: 0,
-        }))
-        .filter((segment) => segment.date === safeDate)
-        .map(({ date, ...segment }, index) => ({
-          ...segment,
-          fallbackOrder: dayMatches.length + index + 1,
-        }))
-    )
-    const standaloneDaySegments = (s.standaloneSegments || [])
-      .filter((segment) => fmt(segment.date) === safeDate)
-      .map((segment, index) => ({
-        kind: 'segment',
-        storyId: null,
-        segmentIndex: index,
-        segmentId: segment.id,
-        cardOrder: Number(segment.cardOrder) || 0,
-        fallbackOrder: dayMatches.length + daySegments.length + index + 1,
-      }))
-
-    const ordered = [...dayMatches, ...daySegments, ...standaloneDaySegments]
-      .map((entry) => ({
-        ...entry,
-        effectiveOrder: entry.cardOrder || entry.fallbackOrder,
-      }))
-      .sort((a, b) => a.effectiveOrder - b.effectiveOrder)
+    const ordered = buildDayCardEntries(s, date)
 
     const currentIndex = ordered.findIndex((entry) =>
       item.kind === 'match'
@@ -1324,45 +1443,35 @@ export function useStore() {
     const reordered = [...ordered]
     const [movedItem] = reordered.splice(currentIndex, 1)
     reordered.splice(swapIndex, 0, movedItem)
+    applyDayCardOrder(s, date, reordered)
+    return s
+  })
 
-    const nextOrderMap = new Map(
-      reordered.map((entry, index) => {
-        const key = entry.kind === 'match'
-          ? `match:${entry.id}`
-          : `segment:${entry.segmentId ?? `${entry.storyId}:${entry.segmentIndex}`}`
-        return [key, index + 1]
-      })
+  const reorderDayCardItem = (date, draggedItem, targetItem) => update((s) => {
+    const ordered = buildDayCardEntries(s, date)
+
+    const matchesEntry = (entry, item) => (
+      item.kind === 'match'
+        ? entry.kind === 'match' && entry.id === item.id
+        : entry.kind === 'segment' && (
+          (item.segmentId != null && entry.segmentId === item.segmentId)
+          || (entry.storyId === item.storyId && entry.segmentIndex === item.segmentIndex)
+        )
     )
 
-    s.matches = s.matches.map((match) => {
-      if (fmt(match.date) !== safeDate) return match
-      const nextOrder = nextOrderMap.get(`match:${match.id}`)
-      if (!nextOrder) return match
-      return { ...match, cardOrder: nextOrder }
-    })
+    const fromIndex = ordered.findIndex((entry) => matchesEntry(entry, draggedItem))
+    const toIndex = ordered.findIndex((entry) => matchesEntry(entry, targetItem))
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return s
 
-    s.stories = s.stories.map((story) => ({
-      ...story,
-      segments: (story.segments || []).map((segment, index) => {
-        if (fmt(segment.date) !== safeDate) return segment
-        const nextOrder = nextOrderMap.get(`segment:${segment.id ?? `${story.id}:${index}`}`)
-        if (!nextOrder) return segment
-        return { ...segment, cardOrder: nextOrder }
-      }),
-    }))
-
-    s.standaloneSegments = (s.standaloneSegments || []).map((segment, index) => {
-      if (fmt(segment.date) !== safeDate) return segment
-      const nextOrder = nextOrderMap.get(`segment:${segment.id ?? `standalone:${index}`}`)
-      if (!nextOrder) return segment
-      return { ...segment, cardOrder: nextOrder }
-    })
-
+    const reordered = [...ordered]
+    const [movedItem] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, movedItem)
+    applyDayCardOrder(s, date, reordered)
     return s
   })
 
   const exportData = useCallback(() => ({
-    app: 'wum',
+    app: 'heat',
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
     state,
@@ -1380,7 +1489,7 @@ export function useStore() {
       throw new Error('The selected file does not contain a valid save.')
     }
 
-    const incomingState = parsed.app === 'wum' && parsed.state ? parsed.state : parsed
+    const incomingState = ['wum', 'heat'].includes(parsed.app) && parsed.state ? parsed.state : parsed
     const normalized = normalizeStoredState(incomingState)
 
     setState(normalized)
@@ -1419,6 +1528,13 @@ export function useStore() {
 
       if (scope === 'matches') {
         next.matches = []
+        next.wrestlers = next.wrestlers.map((wrestler) => ({
+          ...wrestler,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          streak: 0,
+        }))
         next.tournaments = (next.tournaments || []).map((tournament) => recalculateTournamentBracket({
           ...tournament,
           rounds: tournament.rounds.map((round) => ({
@@ -1434,6 +1550,7 @@ export function useStore() {
       } else if (scope === 'stories') {
         next.stories = []
         next.standaloneSegments = []
+        next.matches = next.matches.map((match) => ({ ...match, storyId: null }))
       } else if (scope === 'teams') {
         next.teams = []
         next.stories = pruneStoriesByParticipantType(next.stories, 'team')
@@ -1547,6 +1664,7 @@ export function useStore() {
     updateSegment,
     deleteSegment,
     moveDayCardItem,
+    reorderDayCardItem,
     exportData,
     importData,
     createManualSnapshot,

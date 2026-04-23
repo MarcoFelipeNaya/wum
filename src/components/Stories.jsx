@@ -21,11 +21,77 @@ function getMatchTypeLabel(match) {
 
 const SEGMENT_CATEGORIES = [
   { key: 'promos', label: 'Promos & Interviews', types: ['Promo (In-Ring)', 'Promo (Backstage)', 'Pre-Tape Promo', 'Interview (In-Ring)', 'Interview (Backstage)'] },
-  { key: 'brawls', label: 'Brawls & Attacks', types: ['Brawl / Beatdown', 'Ambush / Attack', 'Pull-Apart'] },
-  { key: 'story', label: 'Story & Character', types: ['Character Moment', 'Storyline Advancement', 'Alliance / Betrayal'] },
-  { key: 'authority', label: 'Authority & Management', types: ['GM Announcement', 'Contract Signing', 'Title Ceremony'] },
-  { key: 'vignettes', label: 'Vignettes & Video', types: ['Vignette', 'Video Package', 'Recap Segment'] },
-  { key: 'celebrations', label: 'Celebrations & Special', types: ['Championship Celebration', 'Retirement / Return', 'Special Appearance'] },
+  {
+    key: 'brawls',
+    label: 'Brawls & Attacks',
+    types: [
+      'Brawl / Beatdown',
+      'Ambush / Attack',
+      'Pull-Apart',
+      'Confrontation',
+      'Pull-Apart Brawl',
+      'In-Ring Brawl',
+      'Backstage Brawl',
+      'Backstage Attack',
+      'In-Ring Attack',
+      'Post-Match Attack',
+    ],
+  },
+  {
+    key: 'story',
+    label: 'Story & Character',
+    types: [
+      'Character Moment',
+      'Storyline Advancement',
+      'Alliance / Betrayal',
+      'Arrival',
+      'Locker Room Segment',
+      'Internal Conversation',
+      'Team Meeting',
+      'Challenge Issued',
+      'Stipulation Reveal',
+      'Team Formation',
+      'Team Breakup',
+      'Medical Update',
+      'Mystery Angle',
+    ],
+  },
+  {
+    key: 'authority',
+    label: 'Authority & Management',
+    types: [
+      'GM Announcement',
+      'Contract Signing',
+      'Title Ceremony',
+      'Authority Announcement',
+      'Authority Confrontation',
+    ],
+  },
+  {
+    key: 'vignettes',
+    label: 'Vignettes & Video',
+    types: [
+      'Vignette',
+      'Video Package',
+      'Recap Segment',
+      'Taped Vignette',
+      'Match Hype Package',
+      'Sponsor Segment',
+    ],
+  },
+  {
+    key: 'celebrations',
+    label: 'Celebrations & Special',
+    types: [
+      'Championship Celebration',
+      'Retirement / Return',
+      'Special Appearance',
+      'Celebration',
+      'Ceremony',
+      'Talk Show Segment',
+      'In-Ring Ceremony',
+    ],
+  },
 ]
 
 function segmentTypeBadgeColor(segmentType) {
@@ -33,9 +99,11 @@ function segmentTypeBadgeColor(segmentType) {
   const t = segmentType.toLowerCase()
   if (t.includes('promo') || t.includes('interview')) return '#2980b9'
   if (t.includes('brawl') || t.includes('attack') || t.includes('ambush')) return '#c0392b'
+  if (t.includes('confrontation') || t.includes('challenge') || t.includes('mystery') || t.includes('arrival') || t.includes('locker') || t.includes('conversation') || t.includes('meeting') || t.includes('formation') || t.includes('breakup') || t.includes('medical') || t.includes('stipulation')) return '#8e44ad'
   if (t.includes('vignette') || t.includes('video') || t.includes('recap')) return '#9b59b6'
-  if (t.includes('gm') || t.includes('contract') || t.includes('ceremony')) return '#d4af37'
-  if (t.includes('celebration') || t.includes('retirement') || t.includes('return')) return '#27ae60'
+  if (t.includes('hype') || t.includes('sponsor')) return '#9b59b6'
+  if (t.includes('gm') || t.includes('authority') || t.includes('contract')) return '#d4af37'
+  if (t.includes('celebration') || t.includes('retirement') || t.includes('return') || t.includes('talk show') || t.includes('ceremony')) return '#27ae60'
   return '#666'
 }
 
@@ -51,6 +119,7 @@ function computeTaleOfTape(story, matches, getWrestler, getFaction, getTeam) {
 
   const storyMatches = matches
     .filter((match) => {
+      if (match.storyId === story.id) return true
       const mw = getParticipantIdsFromMatch(match)
       const involvedSides = story.participants.filter((participant) =>
         getParticipantIds(participant).some((id) => mw.includes(id))

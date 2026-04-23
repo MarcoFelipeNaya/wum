@@ -6,6 +6,7 @@ import { faStar as faStarSolid, faStarHalfStroke } from '@fortawesome/free-solid
 import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons'
 
 const ALLOWED_PARTICIPANT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
+const FINISH_TYPES = ['Clean Pinfall', 'Submission', 'DQ', 'Count Out', 'Interference', 'Roll-Up', 'Knockout', 'Ref Stoppage', 'No Contest']
 
 const SEGMENT_CATEGORIES = [
   {
@@ -193,6 +194,12 @@ function getStarIconForRating(rating, starIndex) {
   return faStarRegular
 }
 
+function getDragPayload(item) {
+  return item.kind === 'match'
+    ? { kind: 'match', id: item.id }
+    : { kind: 'segment', storyId: item.storyId, segmentIndex: item.segmentIndex, segmentId: item.segmentId }
+}
+
 function MatchRatingInput({ rating, disabled, onChange }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
@@ -256,6 +263,15 @@ function isTitleCompatibleWithMatch(title, participantCount, mode) {
   return safeMode !== 'tag' && safeMode !== 'trios' && safeMode !== '3tag'
 }
 
+function getStoryParticipantIds(story, teams, factions) {
+  return (story.participants || []).flatMap((participant) => {
+    if (participant.type === 'wrestler') return [participant.id]
+    if (participant.type === 'team') return teams.find((team) => team.id === participant.id)?.memberIds || []
+    if (participant.type === 'faction') return factions.find((faction) => faction.id === participant.id)?.memberIds || []
+    return []
+  })
+}
+
 function SectionCard({ title, children }) {
   return (
     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 14 }}>
@@ -272,6 +288,7 @@ export default function DayMatchesModal({
   titles,
   wrestlers,
   teams = [],
+  factions = [],
   stories = [],
   showToast,
   dayShows,
@@ -294,6 +311,7 @@ export default function DayMatchesModal({
   onUpdateSegment,
   onDeleteSegment,
   onMoveDayCardItem,
+  onReorderDayCardItem,
 }) {
   const idx = getCustomDow(date)
   const modalMonthIndex = getMonthIndex(date)
@@ -313,6 +331,9 @@ export default function DayMatchesModal({
   const [matchMode, setMatchMode] = useState('singles')
   const [editParticipantCount, setEditParticipantCount] = useState(2)
   const [editMatchMode, setEditMatchMode] = useState('singles')
+  const [winnerFinishTypes, setWinnerFinishTypes] = useState({})
+  const [draggedItem, setDraggedItem] = useState(null)
+  const [dragOverKey, setDragOverKey] = useState(null)
 
   // Segment booking state
   const [segTitle, setSegTitle] = useState('')
@@ -373,6 +394,7 @@ export default function DayMatchesModal({
     const fromTitles = [...new Set(titles.map((t) => t.show).filter(Boolean))]
     return [...new Set([...fromWrestlers, ...fromTitles])].sort()
   }, [wrestlers, titles])
+  const getStory = (id) => stories.find((story) => story.id === id) || null
 
   const filterByBrand = (items, filterValue, showField) => {
     if (filterValue === 'all') return items
@@ -406,6 +428,17 @@ export default function DayMatchesModal({
 
   const bookingWrestlers = getAvailableWrestlers()
   const bookingTitles = getAvailableTitles(participantCount, matchMode)
+  const activeStories = useMemo(() => stories.filter((story) => story.status !== 'Concluded'), [stories])
+
+  const getSuggestedStories = (participantIds = []) => {
+    const safeIds = uniqueIds(participantIds)
+    if (safeIds.length === 0) return []
+    return activeStories.filter((story) => {
+      const storyIds = getStoryParticipantIds(story, teams, factions)
+      const overlapCount = safeIds.filter((id) => storyIds.includes(id)).length
+      return overlapCount >= 2
+    })
+  }
 
   const segmentWrestlers = useMemo(() => {
     let list = filterByBrand(wrestlers, segWrestlerBrand === 'all' ? 'all' : segWrestlerBrand, 'show')
@@ -574,7 +607,12 @@ export default function DayMatchesModal({
     const participantIds = layout.isTeamBased
       ? collectTeamParticipants(fd, layout)
       : collectFlatParticipants(fd, editParticipantCount)
-    onUpdateMatch(match.id, { participantIds, titleId, mode, notes, stipulation })
+    const submittedStory = fd.get('storyId') || ''
+    const suggestedStories = getSuggestedStories(participantIds)
+    const storyId = submittedStory === 'auto'
+      ? (suggestedStories.length === 1 ? suggestedStories[0].id : null)
+      : (parseInt(submittedStory, 10) || null)
+    onUpdateMatch(match.id, { participantIds, titleId, mode, notes, stipulation, storyId })
     setEditingMatchId(null)
   }
 
@@ -583,6 +621,7 @@ export default function DayMatchesModal({
     const participants = participantIds.map(getW).filter(Boolean)
     const teamsFromMatch = getTeamsFromMatch(match)
     const titleMatch = match.titleId ? getT(match.titleId) : null
+    const linkedStory = match.storyId ? getStory(match.storyId) : null
     const lines = []
 
     lines.push(index != null
@@ -590,7 +629,9 @@ export default function DayMatchesModal({
       : `Match ${match.matchType || getMatchTypeLabel(participantIds.length, match.mode)}`)
 
     if (match.stipulation) lines.push(`Stipulation: ${match.stipulation}`)
+    if (match.finishType) lines.push(`Finish: ${match.finishType}`)
     if (titleMatch) lines.push(`Title: ${titleMatch.name}`)
+    if (linkedStory) lines.push(`Story: ${linkedStory.name}`)
 
     if (teamsFromMatch) {
       teamsFromMatch.forEach((teamIds, teamIndex) => {
@@ -656,10 +697,40 @@ export default function DayMatchesModal({
 
   const handleMoveItem = (item, direction) => {
     if (!onMoveDayCardItem) return
-    const payload = item.kind === 'match'
-      ? { kind: 'match', id: item.id }
-      : { kind: 'segment', storyId: item.storyId, segmentIndex: item.segmentIndex, segmentId: item.segmentId }
-    onMoveDayCardItem(date, payload, direction)
+    onMoveDayCardItem(date, getDragPayload(item), direction)
+  }
+
+  const handleWinnerSelect = (matchId, winnerId) => {
+    const finishType = winnerFinishTypes[matchId] || ''
+    if (!finishType) {
+      showToast?.('Select a finish type before setting the winner')
+      return
+    }
+    onSetWinner?.(matchId, winnerId, finishType)
+  }
+
+  const handleDragStart = (item) => {
+    if (!isCurrentDay) return
+    setDraggedItem(getDragPayload(item))
+  }
+
+  const handleDragOver = (e, item) => {
+    if (!isCurrentDay || !draggedItem) return
+    e.preventDefault()
+    setDragOverKey(`${item.kind}:${item.id ?? item.segmentId}`)
+  }
+
+  const handleDrop = (item) => {
+    if (!isCurrentDay || !draggedItem || !onReorderDayCardItem) return
+    const targetPayload = getDragPayload(item)
+    onReorderDayCardItem(date, draggedItem, targetPayload)
+    setDraggedItem(null)
+    setDragOverKey(null)
+  }
+
+  const clearDragState = () => {
+    setDraggedItem(null)
+    setDragOverKey(null)
   }
 
   const handleBookSubmit = (e) => {
@@ -674,7 +745,12 @@ export default function DayMatchesModal({
     const participantIds = layout.isTeamBased
       ? collectTeamParticipants(fd, layout)
       : collectFlatParticipants(fd, participantCount)
-    onBookMatch(date, participantIds, titleId, mode, notes, stipulation)
+    const submittedStory = fd.get('storyId') || ''
+    const suggestedStories = getSuggestedStories(participantIds)
+    const storyId = submittedStory === 'auto'
+      ? (suggestedStories.length === 1 ? suggestedStories[0].id : null)
+      : (parseInt(submittedStory, 10) || null)
+    onBookMatch(date, participantIds, titleId, mode, notes, stipulation, { storyId })
     resetMatchForm()
   }
 
@@ -683,9 +759,40 @@ export default function DayMatchesModal({
   const activeCategoryTypes = segCategory
     ? SEGMENT_CATEGORIES.find((c) => c.key === segCategory)?.types ?? []
     : []
+  const specialEvent = dayShows.find((show) => show.kind === 'special') || null
+  const primaryBrand = dayShows[0] || null
+  const accentColor = specialEvent?.color || primaryBrand?.color || 'var(--gold)'
+  const completedMatches = dayMatches.filter((match) => match.winnerId)
+  const topRatedMatch = [...completedMatches]
+    .filter((match) => match.rating != null)
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))[0] || null
+  const titleChanges = completedMatches.filter((match) => match.titleId)
 
   return (
     <Modal title={titleStr} onClose={onClose} style={{ maxWidth: isCurrentDay ? '1600px' : '800px' }}>
+      {specialEvent && (
+        <div style={{
+          marginBottom: 14,
+          padding: '16px 18px',
+          borderRadius: 'var(--radius)',
+          border: `1px solid ${accentColor}55`,
+          background: `linear-gradient(135deg, ${accentColor}22, rgba(10, 10, 16, 0.92))`,
+          boxShadow: `inset 0 1px 0 ${accentColor}22`,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 11, color: accentColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>Special Event</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, lineHeight: 1, marginTop: 6 }}>{specialEvent.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 8 }}>{specialEvent.brandName} presentation</div>
+            </div>
+            <div style={{ display: 'grid', gap: 6, minWidth: 180 }}>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Booked Matches: <strong style={{ color: 'var(--text)' }}>{dayMatches.length}</strong></div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Booked Segments: <strong style={{ color: 'var(--text)' }}>{daySegments.length}</strong></div>
+              <div style={{ fontSize: 12, color: 'var(--text2)' }}>Title Matches: <strong style={{ color: 'var(--text)' }}>{titleChanges.length}</strong></div>
+            </div>
+          </div>
+        </div>
+      )}
       {isCurrentDay && !allDone && (
         <div className="modal-banner banner-live">Current show - book matches and set all winners to advance</div>
       )}
@@ -694,6 +801,32 @@ export default function DayMatchesModal({
       )}
       {!isCurrentDay && (
         <div className="modal-banner banner-past">Past show - view only</div>
+      )}
+      {!isCurrentDay && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 10,
+          marginBottom: 16,
+        }}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Matches</div>
+            <div style={{ fontSize: 28, fontFamily: 'var(--font-display)' }}>{completedMatches.length}</div>
+          </div>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Segments</div>
+            <div style={{ fontSize: 28, fontFamily: 'var(--font-display)' }}>{daySegments.length}</div>
+          </div>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Title Matches</div>
+            <div style={{ fontSize: 28, fontFamily: 'var(--font-display)' }}>{titleChanges.length}</div>
+          </div>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', padding: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Top Rated</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{topRatedMatch ? `${formatRatingValue(topRatedMatch.rating)} / 5` : 'No ratings'}</div>
+            {topRatedMatch && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>{topRatedMatch.matchType}</div>}
+          </div>
+        </div>
       )}
 
       <div style={{
@@ -803,6 +936,15 @@ export default function DayMatchesModal({
                 </div>
 
                 <div className="form-group">
+                  <label>Story Link (optional)</label>
+                  <select name="storyId" defaultValue="auto" style={{ ...selectStyle, width: '100%' }}>
+                    <option value="">- No linked story -</option>
+                    <option value="auto">Auto-detect from participants</option>
+                    {activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label>Match Notes</label>
                   <textarea name="notes" defaultValue="" placeholder="What happened in the match?" rows={5} style={{ ...selectStyle, width: '100%', resize: 'vertical' }} />
                 </div>
@@ -840,10 +982,18 @@ export default function DayMatchesModal({
                       ? SEGMENT_CATEGORIES.find((category) => category.key === editSegCategory)?.types ?? []
                       : []
                     return (
-                      <div key={`segment-${seg.storyId}-${seg.segmentIndex}`} style={{
+                      <div key={`segment-${seg.storyId}-${seg.segmentIndex}`}
+                        draggable={isCurrentDay}
+                        onDragStart={() => handleDragStart(item)}
+                        onDragEnd={clearDragState}
+                        onDragOver={(e) => handleDragOver(e, item)}
+                        onDrop={() => handleDrop(item)}
+                        style={{
                         padding: '10px 12px', background: 'var(--bg3)',
                         border: '1px solid var(--border2)', borderLeft: '3px solid #9b59b6',
                         borderRadius: 'var(--radius)',
+                        opacity: draggedItem && dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 0.92 : 1,
+                        boxShadow: dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? '0 0 0 2px rgba(212, 175, 55, 0.2)' : 'none',
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -856,6 +1006,7 @@ export default function DayMatchesModal({
                             {seg.storyName && <span style={{ fontSize: 10, color: 'var(--text2)' }}>→ {seg.storyName}</span>}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {isCurrentDay && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Drag</span>}
                             <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}>Up</button>
                             <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}>Down</button>
                             {isCurrentDay && onUpdateSegment && (
@@ -972,6 +1123,7 @@ export default function DayMatchesModal({
                   const participants = participantIds.map(getW).filter(Boolean)
                   const teams = getTeamsFromMatch(m)
                   const titleMatch = m.titleId ? getT(m.titleId) : null
+                  const linkedStory = m.storyId ? getStory(m.storyId) : null
                   const isEditingThisMatch = editingMatchId === m.id
                   const editWrestlers = getAvailableWrestlers(participantIds)
                   const editTitles = getAvailableTitles(editParticipantCount, editMatchMode, m.titleId)
@@ -980,14 +1132,26 @@ export default function DayMatchesModal({
                   const hasNotes = !!m.notes?.trim()
                   const isNotesExpanded = expandedNotesId === m.id
                   return (
-                    <div key={`match-${m.id}`} className="match-card">
+                    <div
+                      key={`match-${m.id}`}
+                      className="match-card"
+                      draggable={isCurrentDay}
+                      onDragStart={() => handleDragStart(item)}
+                      onDragEnd={clearDragState}
+                      onDragOver={(e) => handleDragOver(e, item)}
+                      onDrop={() => handleDrop(item)}
+                      style={dragOverKey === `${item.kind}:${item.id}` ? { boxShadow: '0 0 0 2px rgba(212, 175, 55, 0.2)' } : undefined}
+                    >
                       <div className="match-header-row">
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span className="match-num">Match {i + 1} - {m.matchType || getMatchTypeLabel(participantIds.length, m.mode)}</span>
                           {i === 0 && <span className="badge badge-gold" style={{ fontSize: 10 }}>Main Event</span>}
                           {m.stipulation && <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.stipulation}</span>}
+                          {m.finishType && <span className="badge" style={{ fontSize: 10, background: 'rgba(41, 128, 185, 0.18)', color: '#6cb7ff', border: '1px solid rgba(41, 128, 185, 0.35)' }}>{m.finishType}</span>}
+                          {linkedStory && <span className="badge" style={{ fontSize: 10, background: 'rgba(155, 89, 182, 0.18)', color: '#d8a8ff', border: '1px solid rgba(155, 89, 182, 0.35)' }}>{linkedStory.name}</span>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {isCurrentDay && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Drag</span>}
                           <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}>Up</button>
                           <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}>Down</button>
                           {titleMatch && <span className="badge badge-gold" style={{ fontSize: 10 }}>[B] {titleMatch.name.split(' ')[0]} Title</span>}
@@ -996,28 +1160,58 @@ export default function DayMatchesModal({
                       {!isEditingThisMatch && (
                         <>
                           {!teams && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                            <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+                              {!m.winnerId && (
+                                <div style={{ display: 'grid', gap: 6 }}>
+                                  <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
+                                  <select
+                                    value={winnerFinishTypes[m.id] || ''}
+                                    onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
+                                    style={{ ...selectStyle, width: '100%' }}
+                                  >
+                                    <option value="">- Required to set winner -</option>
+                                    {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
+                                  </select>
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                               {participants.map((w) => (
-                                <button key={w.id} className={`winner-btn${m.winnerId === w.id ? ' selected' : ''}`} onClick={() => isCurrentDay && onSetWinner(m.id, w.id)} disabled={!isCurrentDay}>{w.name}</button>
+                                <button key={w.id} className={`winner-btn${m.winnerId === w.id ? ' selected' : ''}`} onClick={() => isCurrentDay && handleWinnerSelect(m.id, w.id)} disabled={!isCurrentDay}>{w.name}</button>
                               ))}
+                            </div>
                             </div>
                           )}
                           {teams && (
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${teams.length}, minmax(0, 1fr))`, gap: 12, marginTop: 10, alignItems: 'start' }}>
+                            <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+                              {!m.winnerId && (
+                                <div style={{ display: 'grid', gap: 6 }}>
+                                  <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
+                                  <select
+                                    value={winnerFinishTypes[m.id] || ''}
+                                    onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
+                                    style={{ ...selectStyle, width: '100%' }}
+                                  >
+                                    <option value="">- Required to set winner -</option>
+                                    {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
+                                  </select>
+                                </div>
+                              )}
+                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${teams.length}, minmax(0, 1fr))`, gap: 12, alignItems: 'start' }}>
                               {teams.map((teamIds, teamIndex) => (
                                 <div key={`team-${teamIndex}`}>
                                   <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team {String.fromCharCode(65 + teamIndex)}</div>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                                     {teamIds.map((id) => {
                                       const w = getW(id); if (!w) return null
-                                      return <button key={id} className={`winner-btn${m.winnerId === id ? ' selected' : ''}`} onClick={() => isCurrentDay && onSetWinner(m.id, id)} disabled={!isCurrentDay}>{w.name}</button>
+                                      return <button key={id} className={`winner-btn${m.winnerId === id ? ' selected' : ''}`} onClick={() => isCurrentDay && handleWinnerSelect(m.id, id)} disabled={!isCurrentDay}>{w.name}</button>
                                     })}
                                   </div>
                                 </div>
                               ))}
                             </div>
+                            </div>
                           )}
-                          {m.winnerId && <div className="match-winner-label">Winner: {getW(m.winnerId)?.name}</div>}
+                          {m.winnerId && <div className="match-winner-label">Winner: {getW(m.winnerId)?.name}{m.finishType ? ` • ${m.finishType}` : ''}</div>}
                           <MatchRatingInput
                             rating={m.rating ?? null}
                             disabled={!isCurrentDay || !m.winnerId || !onSetMatchRating}
@@ -1097,6 +1291,7 @@ export default function DayMatchesModal({
                           )}
                           <div className="form-group"><label>Stipulation (optional)</label><input name="stipulation" defaultValue={m.stipulation || ''} placeholder="e.g. Casket Match, No DQ, Iron Man" style={{ ...selectStyle, width: '100%' }} /></div>
                           <div className="form-group"><label>Title on the line (optional)</label><select name="titleId" defaultValue={m.titleId ?? ''} style={{ ...selectStyle, flex: 'unset', width: '100%' }}><option value="">- No title match -</option>{editTitles.map((t) => { const champNames = getChampIds(t).map((id) => getW(id)?.name).filter(Boolean); return <option key={t.id} value={t.id}>{t.name} [{getTitleType(t)}] {champNames.length > 0 ? `(C: ${champNames.join(' / ')})` : '(Vacant)'}</option> })}</select></div>
+                          <div className="form-group"><label>Story Link (optional)</label><select name="storyId" defaultValue={m.storyId ?? 'auto'} style={{ ...selectStyle, width: '100%' }}><option value="">- No linked story -</option><option value="auto">Auto-detect from participants</option>{activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}</select></div>
                           <div className="form-group"><label>Match Notes</label><textarea name="notes" defaultValue={m.notes || ''} placeholder="What happened in the match?" rows={4} style={{ ...selectStyle, width: '100%', resize: 'vertical' }} /></div>
                           <div className="form-actions">
                             <button type="button" className="btn btn-secondary" onClick={() => setEditingMatchId(null)}>Cancel</button>

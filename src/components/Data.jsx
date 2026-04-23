@@ -55,7 +55,7 @@ export default function Data({
       const anchor = document.createElement('a')
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
       anchor.href = url
-      anchor.download = `wum-backup-${stamp}.json`
+      anchor.download = `heat-backup-${stamp}.json`
       anchor.click()
       URL.revokeObjectURL(url)
       showToast('Backup exported')
@@ -237,7 +237,7 @@ export default function Data({
           </div>
 
           {autosaveSnapshots.length === 0 ? (
-            <div className="data-note-row">No autosave snapshots are available yet. Once you keep working in the app, WUM will build a rolling recovery history automatically.</div>
+            <div className="data-note-row">No autosave snapshots are available yet. Once you keep working in the app, Heat will build a rolling recovery history automatically.</div>
           ) : (
             <div className="data-autosave-list">
               {autosaveSnapshots.map((snapshot) => (

@@ -5,6 +5,7 @@ import Roster from './components/Roster.jsx'
 import Factions from './components/Factions.jsx'
 import Shows from './components/Shows.jsx'
 import Rankings from './components/Rankings.jsx'
+import Records from './components/Records.jsx'
 import Calendar from './components/Calendar.jsx'
 import Titles from './components/Titles.jsx'
 import Stories from './components/Stories.jsx'
@@ -29,7 +30,7 @@ export default function App() {
           <div className="card" style={{ maxWidth: 420, textAlign: 'center' }}>
             <h1 className="page-title" style={{ marginBottom: 8 }}>Loading Universe</h1>
             <p style={{ color: 'var(--text2)', margin: 0 }}>
-              Restoring your saved data and autosaves from local storage.
+              Restoring your saved data and autosaves from local storage and IndexedDB.
             </p>
           </div>
         </main>
@@ -47,6 +48,7 @@ export default function App() {
         {page === 'factions'  && <Factions  {...pageProps} />}
         {page === 'shows'     && <Shows     {...pageProps} />}
         {page === 'rankings'  && <Rankings  {...pageProps} />}
+        {page === 'records'   && <Records   {...pageProps} />}
         {page === 'calendar'  && <Calendar  {...pageProps} advanceDay={store.advanceDay} />}
         {page === 'tournaments' && <Tournaments {...pageProps} />}
         {page === 'titles'    && <Titles    {...pageProps} />}

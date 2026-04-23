@@ -1,6 +1,25 @@
 import React, { useMemo, useState } from 'react'
 import { buildRankings } from '../utils/rankings.js'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faFire } from '@fortawesome/free-solid-svg-icons'
 import './Rankings.css'
+
+function getWinPctClass(winPct) {
+  if (winPct >= 75) return 'rankings-stat rankings-stat-elite'
+  if (winPct >= 60) return 'rankings-stat rankings-stat-strong'
+  if (winPct >= 45) return 'rankings-stat rankings-stat-steady'
+  if (winPct >= 30) return 'rankings-stat rankings-stat-cold'
+  return 'rankings-stat rankings-stat-danger'
+}
+
+function getStreakClass(streak) {
+  if (streak >= 5) return 'rankings-stat rankings-stat-fire'
+  if (streak >= 3) return 'rankings-stat rankings-stat-elite'
+  if (streak > 0) return 'rankings-stat rankings-stat-strong'
+  if (streak <= -3) return 'rankings-stat rankings-stat-cold'
+  if (streak < 0) return 'rankings-stat rankings-stat-danger'
+  return 'rankings-stat rankings-stat-neutral'
+}
 
 export default function Rankings({ state }) {
   const { wrestlers = [], titles = [], matches = [], shows = [] } = state || {}
@@ -11,6 +30,8 @@ export default function Rankings({ state }) {
     gender: 'all',
     status: 'all',
   })
+  const [sortBy, setSortBy] = useState('prs')
+  const [sortDirection, setSortDirection] = useState('desc')
 
   const rankedRows = buildRankings(wrestlers, matches, titles)
   const filteredRows = useMemo(() => {
@@ -27,11 +48,36 @@ export default function Rankings({ state }) {
         if (filters.status !== 'all' && (wrestler.status || '') !== filters.status) return false
         return true
       })
+      .sort((a, b) => {
+        const direction = sortDirection === 'asc' ? 1 : -1
+
+        if (sortBy === 'winPct') {
+          if (a.winPct !== b.winPct) return (a.winPct - b.winPct) * direction
+          if (a.prs !== b.prs) return (a.prs - b.prs) * direction
+          return a.name.localeCompare(b.name)
+        }
+
+        if (a.prs !== b.prs) return (a.prs - b.prs) * direction
+        if (a.winPct !== b.winPct) return (a.winPct - b.winPct) * direction
+        return a.name.localeCompare(b.name)
+      })
       .map((row, index) => ({ ...row, filteredRank: index + 1 }))
-  }, [filters, rankedRows, wrestlers])
+  }, [filters, rankedRows, wrestlers, sortBy, sortDirection])
 
   const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }))
   const resetFilters = () => setFilters({ search: '', show: 'all', align: 'all', gender: 'all', status: 'all' })
+  const toggleSort = (key) => {
+    if (sortBy === key) {
+      setSortDirection((current) => (current === 'desc' ? 'asc' : 'desc'))
+      return
+    }
+    setSortBy(key)
+    setSortDirection('desc')
+  }
+  const getSortLabel = (key) => {
+    if (sortBy !== key) return ''
+    return sortDirection === 'desc' ? ' ↓' : ' ↑'
+  }
 
   return (
     <div>
@@ -99,8 +145,16 @@ export default function Rankings({ state }) {
               <tr>
                 <th>Rank</th>
                 <th>Wrestler</th>
-                <th>PRS</th>
-                <th>Win %</th>
+                <th>
+                  <button type="button" className={`rankings-sort-btn${sortBy === 'prs' ? ' active' : ''}`} onClick={() => toggleSort('prs')}>
+                    PRS{getSortLabel('prs')}
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className={`rankings-sort-btn${sortBy === 'winPct' ? ' active' : ''}`} onClick={() => toggleSort('winPct')}>
+                    Win %{getSortLabel('winPct')}
+                  </button>
+                </th>
                 <th>Record</th>
                 <th>Matches</th>
                 <th>Streak</th>
@@ -121,10 +175,17 @@ export default function Rankings({ state }) {
                   <td>{row.filteredRank}</td>
                   <td>{row.name}</td>
                   <td>{row.prs.toFixed(2)}</td>
-                  <td>{row.winPct}%</td>
+                  <td>
+                    <span className={getWinPctClass(row.winPct)}>{row.winPct}%</span>
+                  </td>
                   <td>{row.record}</td>
                   <td>{row.matches}</td>
-                  <td>{row.streak}</td>
+                  <td>
+                    <span className={getStreakClass(row.streak)}>
+                      {row.streak >= 5 && <FontAwesomeIcon icon={faFire} className="rankings-stat-icon" />}
+                      {row.streak > 0 ? `+${row.streak}` : row.streak}
+                    </span>
+                  </td>
                   <td>{row.titles}</td>
                 </tr>
               ))}

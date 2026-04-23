@@ -24,6 +24,81 @@
   font-weight: 600;
 }
 
+.rankings-sort-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rankings-sort-btn.active {
+  color: var(--primary);
+}
+
+.rankings-stat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.rankings-stat-icon {
+  margin-right: 6px;
+  font-size: 11px;
+}
+
+.rankings-stat-fire {
+  background: linear-gradient(135deg, rgba(255, 133, 27, 0.22), rgba(192, 57, 43, 0.2));
+  border-color: rgba(255, 133, 27, 0.4);
+  color: #ffb15c;
+  box-shadow: 0 0 14px rgba(255, 133, 27, 0.12);
+}
+
+.rankings-stat-elite {
+  background: rgba(39, 174, 96, 0.18);
+  border-color: rgba(39, 174, 96, 0.35);
+  color: #5fdb98;
+}
+
+.rankings-stat-strong {
+  background: rgba(82, 196, 26, 0.15);
+  border-color: rgba(82, 196, 26, 0.3);
+  color: #9fe870;
+}
+
+.rankings-stat-steady {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.3);
+  color: #e6c96d;
+}
+
+.rankings-stat-neutral {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text2);
+}
+
+.rankings-stat-cold {
+  background: rgba(41, 128, 185, 0.16);
+  border-color: rgba(41, 128, 185, 0.3);
+  color: #7ec5ff;
+}
+
+.rankings-stat-danger {
+  background: rgba(192, 57, 43, 0.16);
+  border-color: rgba(192, 57, 43, 0.3);
+  color: #ff8a7d;
+}
+
 @media (max-width: 640px) {
   .rankings-filters-footer {
     flex-direction: column;

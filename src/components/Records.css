@@ -1,0 +1,242 @@
+.records-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.records-intro {
+  overflow: hidden;
+}
+
+.records-intro-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--primary-light);
+  margin-bottom: 8px;
+}
+
+.records-intro-copy {
+  margin: 0;
+  max-width: 860px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.records-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.records-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.records-section-heading {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.records-card {
+  position: relative;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.records-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-dark);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+}
+
+.records-card-accent {
+  height: 3px;
+  margin: -16px -16px 14px -16px;
+}
+
+.records-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.records-card-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.records-card-title {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.15;
+}
+
+.records-card-open {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.records-card-copy {
+  margin-top: 8px;
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.records-list-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+}
+
+.records-list-rank {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text2);
+}
+
+.records-list-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.records-list-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.records-list-value {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: right;
+}
+
+.records-empty-state {
+  margin-top: 14px;
+  padding: 20px 16px;
+  border-radius: 14px;
+  background: var(--bg3);
+  border: 1px dashed var(--border2);
+  color: var(--text2);
+  text-align: center;
+}
+
+.records-modal-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.records-modal-header {
+  padding: 14px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+}
+
+.records-modal-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.records-modal-copy {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.records-modal-table {
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg2);
+}
+
+.records-modal-table-head,
+.records-modal-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.records-modal-table-head {
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.records-modal-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.records-modal-row {
+  border-top: 1px solid var(--border);
+}
+
+.records-modal-rank,
+.records-modal-value {
+  font-weight: 800;
+}
+
+.records-modal-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.records-modal-show {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .records-modal-table-head {
+    display: none;
+  }
+
+  .records-modal-row {
+    grid-template-columns: 70px 1fr;
+  }
+
+  .records-modal-show,
+  .records-modal-value {
+    grid-column: 2;
+  }
+}
