@@ -109,3 +109,11 @@ export function todayStr() {
 export function isToday(input) {
   return fmt(input) === todayStr()
 }
+
+export function formatUniverseDate(input, options = {}) {
+  const { includeYear = true } = options
+  const { year, month, day } = parseDate(input)
+  const weekNumber = Math.ceil(day / 7)
+  const base = `${MONTHS_FULL[month - 1]} - Week ${weekNumber}`
+  return includeYear ? `${base}, ${year}` : base
+}

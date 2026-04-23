@@ -1,6 +1,9 @@
 {
   "name": "Heat: Wrestling Booker",
   "short_name": "Heat",
+  "description": "A local-first wrestling booking sandbox for building shows, stories, titles, tournaments, and long-running universes.",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/android-chrome-192x192-trans.png",
@@ -15,5 +18,6 @@
   ],
   "theme_color": "#0d0d14",
   "background_color": "#0d0d14",
-  "display": "standalone"
+  "display": "standalone",
+  "orientation": "portrait-primary"
 }

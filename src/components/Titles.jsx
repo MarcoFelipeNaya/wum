@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { daysBetween } from '../utils/dates.js'
+import { daysBetween, formatUniverseDate } from '../utils/dates.js'
 import './Titles.css'
 
 function getChampIds(title) {
@@ -101,6 +101,9 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
 
   const tagTeams = useMemo(() => teams.filter((team) => team.type === 'tag'), [teams])
   const triosTeams = useMemo(() => teams.filter((team) => team.type === 'trio'), [teams])
+  const activeChampionships = useMemo(() => titles.filter((title) => getChampIds(title).length > 0).length, [titles])
+  const universeTitles = useMemo(() => titles.filter((title) => (title.show || 'Universe') === 'Universe').length, [titles])
+  const activeBrands = useMemo(() => new Set(titles.map((title) => title.show || 'Universe')).size, [titles])
   const filteredTitles = useMemo(() => {
     if (showFilter === 'all') return titles
     return titles.filter((title) => (title.show || 'Universe') === showFilter)
@@ -198,6 +201,13 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
           <div className="title-card-subtle">{championLabel === 'Vacant' ? 'Awaiting a champion' : `${days} day${days !== 1 ? 's' : ''} in current reign`}</div>
         </div>
 
+        <div className="title-card-reign-strip">
+          <div
+            className="title-card-reign-fill"
+            style={{ width: `${Math.min(100, Math.max(18, days * 1.2 || 18))}%`, background: `linear-gradient(90deg, ${accent}, rgba(255,255,255,0.08))` }}
+          />
+        </div>
+
         {(mostCombinedDays || mostReigns) && (
           <div className="title-card-highlights">
             {mostCombinedDays && (
@@ -230,11 +240,42 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
 
   return (
     <div className="titles-page">
-      <div className="page-header">
-        <h1 className="page-title">Championships</h1>
-        <button className="btn btn-primary" onClick={() => setModal('add')}>
-          + Create Title
-        </button>
+      <div className="titles-hero card">
+        <div className="titles-hero-copy">
+          <div className="titles-hero-kicker">Heat Championship Office</div>
+          <h1 className="page-title">Championships</h1>
+          <p className="titles-hero-subtle">
+            Follow every belt across the universe, from current champions and reigning dynasties to full lineage and brand identity.
+          </p>
+        </div>
+        <div className="titles-hero-actions">
+          <button className="btn btn-primary" onClick={() => setModal('add')}>
+            + Create Title
+          </button>
+        </div>
+      </div>
+
+      <div className="titles-overview-grid">
+        <div className="titles-overview-card">
+          <div className="titles-overview-label">Total Titles</div>
+          <div className="titles-overview-value">{titles.length}</div>
+          <div className="titles-overview-meta">All singles, tag, trios, and universe-level championships.</div>
+        </div>
+        <div className="titles-overview-card">
+          <div className="titles-overview-label">Active Champions</div>
+          <div className="titles-overview-value">{activeChampionships}</div>
+          <div className="titles-overview-meta">Belts currently assigned to a champion or champion team.</div>
+        </div>
+        <div className="titles-overview-card">
+          <div className="titles-overview-label">Universe Titles</div>
+          <div className="titles-overview-value">{universeTitles}</div>
+          <div className="titles-overview-meta">Championships that sit above one weekly brand.</div>
+        </div>
+        <div className="titles-overview-card">
+          <div className="titles-overview-label">Active Brands</div>
+          <div className="titles-overview-value">{activeBrands}</div>
+          <div className="titles-overview-meta">Brands represented across the current title landscape.</div>
+        </div>
       </div>
 
       <div className="card title-filter-card">
@@ -299,6 +340,12 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
                     <div className="title-detail-subtle">
                       {championLabel === 'Vacant' ? 'This title is currently vacant.' : `Current reign: ${days} day${days !== 1 ? 's' : ''}`}
                     </div>
+                    <div className="title-detail-reign-strip">
+                      <div
+                        className="title-detail-reign-fill"
+                        style={{ width: `${Math.min(100, Math.max(18, days * 1.2 || 18))}%`, background: `linear-gradient(90deg, ${accent}, rgba(255,255,255,0.08))` }}
+                      />
+                    </div>
                   </div>
 
                   <div className="title-detail-section">
@@ -353,8 +400,8 @@ export default function Titles({ state, addTitle, assignTitle, deleteTitle, remo
                               return (
                                 <tr key={index}>
                                   <td>{championNames}</td>
-                                  <td>{entry.wonDate}</td>
-                                  <td>{entry.lostDate}</td>
+                        <td>{entry.wonDate ? formatUniverseDate(entry.wonDate) : '-'}</td>
+                        <td>{entry.lostDate ? formatUniverseDate(entry.lostDate) : '-'}</td>
                                   <td><span className="badge badge-gold">{entry.days}d</span></td>
                                   <td>
                                     <button

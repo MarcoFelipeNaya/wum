@@ -281,6 +281,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  overflow-x: auto;
 }
 
 .cal-day {
@@ -453,6 +454,16 @@
   .calendar-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .cal-nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .cal-range {
+    order: -1;
+    width: 100%;
+  }
 }
 
 @media (max-width: 640px) {
@@ -472,6 +483,11 @@
     font-size: 14px;
   }
 
+  .calendar-grid-shell .day-headers,
+  .calendar-grid-shell .week-row {
+    min-width: 700px;
+  }
+
   .cal-day {
     min-height: 96px;
     padding: 6px;
@@ -481,5 +497,14 @@
   .cal-match-count,
   .cal-summary-chip {
     font-size: 9px;
+  }
+
+  .match-vs-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vs-badge {
+    text-align: center;
   }
 }

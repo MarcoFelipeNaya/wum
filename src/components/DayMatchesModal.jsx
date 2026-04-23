@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
 import { DAY_NAMES, MONTHS } from '../utils/dates.js'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -179,6 +179,18 @@ function getTeamsFromMatch(match) {
   })
 }
 
+function getWinnerNamesFromMatch(match, getW) {
+  if (!match?.winnerId) return []
+  const teams = getTeamsFromMatch(match)
+  if (teams) {
+    const winningTeam = teams.find((team) => team.includes(match.winnerId))
+    if (winningTeam) {
+      return winningTeam.map((id) => getW(id)?.name || 'Unknown')
+    }
+  }
+  return [getW(match.winnerId)?.name || 'Unknown']
+}
+
 function uniqueIds(ids) {
   return [...new Set((ids || []).map((id) => parseInt(id, 10)).filter(Boolean))]
 }
@@ -198,6 +210,12 @@ function getDragPayload(item) {
   return item.kind === 'match'
     ? { kind: 'match', id: item.id }
     : { kind: 'segment', storyId: item.storyId, segmentIndex: item.segmentIndex, segmentId: item.segmentId }
+}
+
+function getDayCardItemKey(item) {
+  return item.kind === 'match'
+    ? `match:${item.id}`
+    : `segment:${item.segmentId ?? `${item.storyId}:${item.segmentIndex}`}`
 }
 
 function MatchRatingInput({ rating, disabled, onChange }) {
@@ -291,7 +309,9 @@ export default function DayMatchesModal({
   factions = [],
   stories = [],
   showToast,
-  dayShows,
+  dayEvents = [],
+  selectedEventId,
+  onSelectEvent,
   dayMatches,
   daySegments = [],
   isCurrentDay,
@@ -318,7 +338,8 @@ export default function DayMatchesModal({
   const modalYear = getYearNum(date)
   const modalDay = getDayNum(date)
   const allDone = dayMatches.length > 0 && dayMatches.every((m) => m.winnerId)
-  const showLabel = dayShows.map((s) => s.name).join(' & ')
+  const selectedEvent = dayEvents.find((event) => event.id === selectedEventId) || dayEvents[0] || null
+  const showLabel = selectedEvent?.name || dayEvents.map((s) => s.name).join(' & ')
   const titleStr = `${DAY_NAMES[idx]}, ${MONTHS[modalMonthIndex]} ${modalDay}, ${modalYear}${showLabel ? ' - ' + showLabel : ''}`
 
   // Match booking state
@@ -334,6 +355,9 @@ export default function DayMatchesModal({
   const [winnerFinishTypes, setWinnerFinishTypes] = useState({})
   const [draggedItem, setDraggedItem] = useState(null)
   const [dragOverKey, setDragOverKey] = useState(null)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1400 : window.innerWidth))
+  const dayCardRefs = useRef(new Map())
+  const previousPositionsRef = useRef(new Map())
 
   // Segment booking state
   const [segTitle, setSegTitle] = useState('')
@@ -352,6 +376,12 @@ export default function DayMatchesModal({
   const [editSegWrestlerSearch, setEditSegWrestlerSearch] = useState('')
   const [editSegWrestlerBrand, setEditSegWrestlerBrand] = useState('all')
   const [editSegSelectedWrestlers, setEditSegSelectedWrestlers] = useState([])
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const editingMatch = useMemo(() => dayMatches.find((m) => m.id === editingMatchId) || null, [dayMatches, editingMatchId])
   const orderedMatches = useMemo(() => [...dayMatches].reverse(), [dayMatches])
@@ -375,6 +405,52 @@ export default function DayMatchesModal({
     return [...matches, ...segments].sort((a, b) => a.cardOrder - b.cardOrder)
   }, [dayMatches, daySegments])
 
+  useLayoutEffect(() => {
+    const nextPositions = new Map()
+
+    dayCardItems.forEach((item) => {
+      const key = getDayCardItemKey(item)
+      const node = dayCardRefs.current.get(key)
+      if (!node) return
+
+      const nextRect = node.getBoundingClientRect()
+      nextPositions.set(key, nextRect)
+
+      const previousRect = previousPositionsRef.current.get(key)
+      if (!previousRect) return
+
+      const deltaY = previousRect.top - nextRect.top
+      if (Math.abs(deltaY) < 1) return
+
+      node.style.transition = 'none'
+      node.style.transform = `translateY(${deltaY}px)`
+      node.style.zIndex = '1'
+
+      requestAnimationFrame(() => {
+        node.style.transition = 'transform 280ms var(--ease-heat), box-shadow 180ms ease'
+        node.style.transform = 'translateY(0)'
+      })
+    })
+
+    previousPositionsRef.current = nextPositions
+  }, [dayCardItems])
+
+  useEffect(() => {
+    const nodes = Array.from(dayCardRefs.current.values())
+    const handleTransitionEnd = (event) => {
+      const node = event.currentTarget
+      if (event.propertyName !== 'transform') return
+      node.style.transition = ''
+      node.style.transform = ''
+      node.style.zIndex = ''
+    }
+
+    nodes.forEach((node) => node.addEventListener('transitionend', handleTransitionEnd))
+    return () => {
+      nodes.forEach((node) => node.removeEventListener('transitionend', handleTransitionEnd))
+    }
+  }, [dayCardItems])
+
   useEffect(() => { setMatchMode((prev) => normalizeMode(participantCount, prev)) }, [participantCount])
   useEffect(() => { setEditMatchMode((prev) => normalizeMode(editParticipantCount, prev)) }, [editParticipantCount])
   useEffect(() => {
@@ -383,10 +459,14 @@ export default function DayMatchesModal({
     setEditParticipantCount(ids.length || 2)
     setEditMatchMode(normalizeMode(ids.length || 2, editingMatch.mode || 'free_for_all'))
   }, [editingMatch])
+  useEffect(() => {
+    setEditingMatchId(null)
+    resetEditSegmentForm()
+  }, [selectedEventId])
 
   const activeShowNames = useMemo(
-    () => [...new Set(dayShows.map((show) => show.brandName || show.name))],
-    [dayShows]
+    () => [...new Set((selectedEvent ? [selectedEvent.brandName || selectedEvent.name] : dayEvents.map((show) => show.brandName || show.name)).filter(Boolean))],
+    [selectedEvent, dayEvents]
   )
 
   const availableShowOptions = useMemo(() => {
@@ -510,10 +590,10 @@ export default function DayMatchesModal({
     e.preventDefault()
     if (!segTitle.trim()) return
     if (onBookSegment) {
-      onBookSegment(date, {
-        storyId: segStoryId === 'auto' ? 'auto' : (segStoryId ? parseInt(segStoryId, 10) : null),
-        title: segTitle.trim(),
-        description: segDescription.trim(),
+    onBookSegment(selectedEventId, date, {
+      storyId: segStoryId === 'auto' ? 'auto' : (segStoryId ? parseInt(segStoryId, 10) : null),
+      title: segTitle.trim(),
+      description: segDescription.trim(),
         segmentType: segType || (segCategory ? SEGMENT_CATEGORIES.find(c => c.key === segCategory)?.label : null),
         wrestlerIds: segSelectedWrestlers,
       })
@@ -612,7 +692,7 @@ export default function DayMatchesModal({
     const storyId = submittedStory === 'auto'
       ? (suggestedStories.length === 1 ? suggestedStories[0].id : null)
       : (parseInt(submittedStory, 10) || null)
-    onUpdateMatch(match.id, { participantIds, titleId, mode, notes, stipulation, storyId })
+    onUpdateMatch(match.id, { participantIds, titleId, mode, notes, stipulation, storyId, eventId: selectedEventId })
     setEditingMatchId(null)
   }
 
@@ -641,7 +721,7 @@ export default function DayMatchesModal({
       lines.push(`Participants: ${participants.map((w) => w.name).join(' vs ')}`)
     }
 
-    if (match.winnerId) lines.push(`Winner: ${getW(match.winnerId)?.name ?? 'Unknown'}`)
+    if (match.winnerId) lines.push(`Winner: ${getWinnerNamesFromMatch(match, getW).join(' / ')}`)
     if (match.rating != null) lines.push(`Rating: ${formatRatingValue(match.rating)} / 5`)
     if (match.notes?.trim()) lines.push(`Notes: ${match.notes.trim()}`)
 
@@ -663,7 +743,7 @@ export default function DayMatchesModal({
     const lines = [titleStr]
 
     if (dayCardItems.length > 0) {
-      lines.push('', 'Show Card')
+      lines.push('', 'Event Card')
       let matchCount = 0
       let segmentCount = 0
       dayCardItems.forEach((item, index) => {
@@ -687,7 +767,7 @@ export default function DayMatchesModal({
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(text)
-        showToast?.('Day card copied')
+        showToast?.('Event card copied')
         return
       }
     } catch {}
@@ -697,7 +777,7 @@ export default function DayMatchesModal({
 
   const handleMoveItem = (item, direction) => {
     if (!onMoveDayCardItem) return
-    onMoveDayCardItem(date, getDragPayload(item), direction)
+    onMoveDayCardItem(selectedEventId, getDragPayload(item), direction)
   }
 
   const handleWinnerSelect = (matchId, winnerId) => {
@@ -723,7 +803,7 @@ export default function DayMatchesModal({
   const handleDrop = (item) => {
     if (!isCurrentDay || !draggedItem || !onReorderDayCardItem) return
     const targetPayload = getDragPayload(item)
-    onReorderDayCardItem(date, draggedItem, targetPayload)
+    onReorderDayCardItem(selectedEventId, draggedItem, targetPayload)
     setDraggedItem(null)
     setDragOverKey(null)
   }
@@ -750,7 +830,7 @@ export default function DayMatchesModal({
     const storyId = submittedStory === 'auto'
       ? (suggestedStories.length === 1 ? suggestedStories[0].id : null)
       : (parseInt(submittedStory, 10) || null)
-    onBookMatch(date, participantIds, titleId, mode, notes, stipulation, { storyId })
+    onBookMatch(selectedEventId, date, participantIds, titleId, mode, notes, stipulation, { storyId })
     resetMatchForm()
   }
 
@@ -759,9 +839,14 @@ export default function DayMatchesModal({
   const activeCategoryTypes = segCategory
     ? SEGMENT_CATEGORIES.find((c) => c.key === segCategory)?.types ?? []
     : []
-  const specialEvent = dayShows.find((show) => show.kind === 'special') || null
-  const primaryBrand = dayShows[0] || null
+  const specialEvent = selectedEvent?.kind === 'special' ? selectedEvent : null
+  const primaryBrand = selectedEvent || dayEvents[0] || null
   const accentColor = specialEvent?.color || primaryBrand?.color || 'var(--gold)'
+  const isCompactLayout = viewportWidth <= 1180
+  const isPhoneLayout = viewportWidth <= 760
+  const modalGridColumns = isCurrentDay ? (isCompactLayout ? '1fr' : '1fr 1fr 1fr') : '1fr'
+  const bookingTeamGridColumns = isPhoneLayout ? '1fr' : `repeat(${bookingLayout.teams.length}, minmax(0, 1fr))`
+  const twoColumnOptionGrid = isPhoneLayout ? '1fr' : '1fr 1fr'
   const completedMatches = dayMatches.filter((match) => match.winnerId)
   const topRatedMatch = [...completedMatches]
     .filter((match) => match.rating != null)
@@ -769,7 +854,7 @@ export default function DayMatchesModal({
   const titleChanges = completedMatches.filter((match) => match.titleId)
 
   return (
-    <Modal title={titleStr} onClose={onClose} style={{ maxWidth: isCurrentDay ? '1600px' : '800px' }}>
+    <Modal title={titleStr} onClose={onClose} style={{ maxWidth: isCurrentDay ? '1600px' : '800px', width: '100%' }}>
       {specialEvent && (
         <div style={{
           marginBottom: 14,
@@ -802,6 +887,24 @@ export default function DayMatchesModal({
       {!isCurrentDay && (
         <div className="modal-banner banner-past">Past show - view only</div>
       )}
+      {dayEvents.length > 1 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+          {dayEvents.map((event) => {
+            const isActive = event.id === selectedEventId
+            return (
+              <button
+                key={event.id}
+                type="button"
+                className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                onClick={() => onSelectEvent?.(event.id)}
+                style={isActive ? { borderColor: event.color, background: event.color, color: '#fff' } : { borderColor: `${event.color}55`, color: event.color, background: `${event.color}18` }}
+              >
+                {event.kind === 'special' ? `${event.name} Event` : event.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
       {!isCurrentDay && (
         <div style={{
           display: 'grid',
@@ -831,7 +934,7 @@ export default function DayMatchesModal({
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isCurrentDay ? '1fr 1fr 1fr' : '1fr',
+        gridTemplateColumns: modalGridColumns,
         gap: 16,
         alignItems: 'start',
       }}>
@@ -893,7 +996,7 @@ export default function DayMatchesModal({
                 )}
 
                 {bookingLayout.isTeamBased && (
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${bookingLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: bookingTeamGridColumns, gap: 12, marginBottom: 12 }}>
                     {bookingLayout.teams.map((team, teamIndex) => (
                       <div key={team.label}>
                         {bookingEligibleTeams.length > 0 && (
@@ -963,7 +1066,7 @@ export default function DayMatchesModal({
           <SectionCard title={isCurrentDay ? 'Match Card' : 'Show Card'}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
               <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopyDayCardText}>
-                Copy Day Card
+                Copy Event Card
               </button>
             </div>
             {dayCardItems.length === 0 && (
@@ -983,6 +1086,11 @@ export default function DayMatchesModal({
                       : []
                     return (
                       <div key={`segment-${seg.storyId}-${seg.segmentIndex}`}
+                        ref={(node) => {
+                          const key = getDayCardItemKey(item)
+                          if (node) dayCardRefs.current.set(key, node)
+                          else dayCardRefs.current.delete(key)
+                        }}
                         draggable={isCurrentDay}
                         onDragStart={() => handleDragStart(item)}
                         onDragEnd={clearDragState}
@@ -1073,7 +1181,7 @@ export default function DayMatchesModal({
                                 ))}
                               </div>
                               {editSegCategory && editActiveCategoryTypes.length > 0 && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: twoColumnOptionGrid, gap: 6 }}>
                                   {editActiveCategoryTypes.map((type) => (
                                     <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
                                       <input type="radio" name={`editSegType-${seg.id}`} value={type} checked={editSegType === type} onChange={() => setEditSegType(type)} style={{ accentColor: 'var(--red, #c0392b)', cursor: 'pointer' }} />
@@ -1135,6 +1243,11 @@ export default function DayMatchesModal({
                     <div
                       key={`match-${m.id}`}
                       className="match-card"
+                      ref={(node) => {
+                        const key = getDayCardItemKey(item)
+                        if (node) dayCardRefs.current.set(key, node)
+                        else dayCardRefs.current.delete(key)
+                      }}
                       draggable={isCurrentDay}
                       onDragStart={() => handleDragStart(item)}
                       onDragEnd={clearDragState}
@@ -1196,7 +1309,7 @@ export default function DayMatchesModal({
                                   </select>
                                 </div>
                               )}
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${teams.length}, minmax(0, 1fr))`, gap: 12, alignItems: 'start' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: isPhoneLayout ? '1fr' : `repeat(${teams.length}, minmax(0, 1fr))`, gap: 12, alignItems: 'start' }}>
                               {teams.map((teamIds, teamIndex) => (
                                 <div key={`team-${teamIndex}`}>
                                   <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team {String.fromCharCode(65 + teamIndex)}</div>
@@ -1211,7 +1324,7 @@ export default function DayMatchesModal({
                             </div>
                             </div>
                           )}
-                          {m.winnerId && <div className="match-winner-label">Winner: {getW(m.winnerId)?.name}{m.finishType ? ` • ${m.finishType}` : ''}</div>}
+                          {m.winnerId && <div className="match-winner-label">Winner: {getWinnerNamesFromMatch(m, getW).join(' / ')}{m.finishType ? ` • ${m.finishType}` : ''}</div>}
                           <MatchRatingInput
                             rating={m.rating ?? null}
                             disabled={!isCurrentDay || !m.winnerId || !onSetMatchRating}
@@ -1265,7 +1378,7 @@ export default function DayMatchesModal({
                             </div>
                           )}
                           {editLayout.isTeamBased && (
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${editLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: isPhoneLayout ? '1fr' : `repeat(${editLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
                               {(() => {
                                 let participantOffset = 0
                                 return editLayout.teams.map((team, teamIndex) => {
@@ -1623,7 +1736,7 @@ export default function DayMatchesModal({
                     ))}
                   </div>
                   {segCategory && activeCategoryTypes.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: twoColumnOptionGrid, gap: 6 }}>
                       {activeCategoryTypes.map((type) => (
                         <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
                           <input type="radio" name="segType" value={type} checked={segType === type} onChange={() => setSegType(type)} style={{ accentColor: 'var(--red, #c0392b)', cursor: 'pointer' }} />

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
+import { formatUniverseDate } from '../utils/dates.js'
 import './Stories.css'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -241,7 +242,7 @@ function StoryCard({ story, tape, getParticipantName, onOpen, onEdit, onDelete }
         </div>
         {tape.lastMatch && (
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', lineHeight: 1 }}>{tape.lastMatch.date}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', lineHeight: 1 }}>{formatUniverseDate(tape.lastMatch.date)}</div>
             <div style={{ fontSize: 10, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Last Match</div>
           </div>
         )}
@@ -391,7 +392,7 @@ function StoryDetailModal({ story, tape, wrestlers, getParticipantName, onClose,
                   <div key={`m-${match.id}`} style={{ padding: '12px 14px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderLeft: '3px solid #c0392b', borderRadius: 'var(--radius)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, padding: '2px 6px', borderRadius: 3, background: 'rgba(192,57,43,0.15)', color: '#c0392b', border: '1px solid rgba(192,57,43,0.3)', textTransform: 'uppercase' }}>Match</span>
-                      <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>{match.date}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>{formatUniverseDate(match.date)}</span>
                       <span style={{ fontSize: 11, color: 'var(--text2)' }}>{getMatchTypeLabel(match)}</span>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, fontSize: 13 }}>
@@ -419,7 +420,7 @@ function StoryDetailModal({ story, tape, wrestlers, getParticipantName, onClose,
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1, padding: '2px 6px', borderRadius: 3, background: 'rgba(155,89,182,0.15)', color: '#9b59b6', border: '1px solid rgba(155,89,182,0.3)', textTransform: 'uppercase' }}>Segment</span>
-                      <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>{seg.date}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>{formatUniverseDate(seg.date)}</span>
                       {seg.segmentType && (
                         <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: typeColor + '22', color: typeColor, border: `1px solid ${typeColor}44` }}>{seg.segmentType}</span>
                       )}
@@ -522,7 +523,7 @@ function StoryDetailModal({ story, tape, wrestlers, getParticipantName, onClose,
                         {completedMatches.slice(-5).map((m, i) => {
                           const side0won = sides[0].ids.includes(m.winnerId)
                           return (
-                            <div key={i} title={`${m.date} — ${side0won ? getParticipantName(sides[0].participant) : getParticipantName(sides[1].participant)} wins`}
+                  <div key={i} title={`${formatUniverseDate(m.date)} — ${side0won ? getParticipantName(sides[0].participant) : getParticipantName(sides[1].participant)} wins`}
                               style={{ flex: 1, height: 22, borderRadius: 3, background: side0won ? '#c0392b' : '#2980b9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ fontSize: 9, fontWeight: 800, color: '#fff' }}>{side0won ? 'A' : 'B'}</span>
                             </div>

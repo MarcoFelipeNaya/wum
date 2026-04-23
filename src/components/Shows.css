@@ -319,12 +319,20 @@
     padding: 14px;
   }
 
-  .shows-compact-grid {
-    grid-template-columns: 1fr;
+  .show-card-header,
+  .show-detail-list-row,
+  .show-fact-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .show-card-footer {
     flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .shows-compact-grid {
+    grid-template-columns: 1fr;
   }
 
   .show-card-open {
@@ -335,6 +343,14 @@
   .show-detail-inline-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .show-detail-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .show-detail-list-row > * {
+    width: 100%;
   }
 
   .show-special-date-grid {

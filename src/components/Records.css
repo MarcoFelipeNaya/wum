@@ -227,6 +227,25 @@
 }
 
 @media (max-width: 720px) {
+  .records-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .records-card-head,
+  .records-list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .records-card-open,
+  .records-list-value {
+    white-space: normal;
+    text-align: left;
+  }
+
+  .records-list-rank {
+    margin-bottom: -4px;
+  }
+
   .records-modal-table-head {
     display: none;
   }

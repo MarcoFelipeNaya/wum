@@ -472,3 +472,30 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+@media (max-width: 640px) {
+  .factions-page {
+    padding: 14px;
+  }
+
+  .stable-card-footer,
+  .stable-detail-list-row,
+  .stable-fact-row,
+  .stable-form-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stable-card-open {
+    margin-left: 0;
+  }
+
+  .stable-detail-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stable-member-meta {
+    margin-left: 0;
+    text-align: left;
+  }
+}

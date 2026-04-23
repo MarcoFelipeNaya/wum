@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { DAY_NAMES, MONTHS_FULL, getCustomDow, parseDate } from '../utils/dates.js'
-import { buildRankings } from '../utils/rankings.js'
+import { DAY_NAMES, getCustomDow, parseDate, formatUniverseDate } from '../utils/dates.js'
+import { buildRankings, buildWeeklyPRSChanges } from '../utils/rankings.js'
 import { getMatchRatingSummary } from '../utils/matchRatings.js'
 import './Dashboard.css'
 
@@ -17,6 +17,23 @@ function getParticipantIds(match) {
   return fallback
 }
 
+function getTeamsFromMatch(match) {
+  const participantIds = getParticipantIds(match)
+  if (match.mode === 'tag' && participantIds.length === 4) {
+    return [participantIds.slice(0, 2), participantIds.slice(2, 4)]
+  }
+  if (match.mode === 'trios' && participantIds.length === 6) {
+    return [participantIds.slice(0, 3), participantIds.slice(3, 6)]
+  }
+  if (match.mode === '3tag' && participantIds.length === 6) {
+    return [participantIds.slice(0, 2), participantIds.slice(2, 4), participantIds.slice(4, 6)]
+  }
+  if (match.mode === 'handicap' && participantIds.length >= 3 && participantIds.length <= 6) {
+    return [participantIds.slice(0, 1), participantIds.slice(1)]
+  }
+  return null
+}
+
 function specialShowOccursOnDate(specialShow, dateStr) {
   if (!specialShow) return false
   if (specialShow.type === 'one_off') return specialShow.oneOffDate === dateStr
@@ -25,8 +42,7 @@ function specialShowOccursOnDate(specialShow, dateStr) {
 }
 
 function formatFullDate(dateStr) {
-  const date = parseDate(dateStr)
-  return `${MONTHS_FULL[date.month - 1]} ${date.day}, ${date.year}`
+  return formatUniverseDate(dateStr)
 }
 
 function segmentTypeBadgeColor(segmentType) {
@@ -153,6 +169,16 @@ export default function Dashboard({ state }) {
     if (storyShowFilter === 'all') return hotStories
     return hotStories.filter((story) => getStoryParticipantIds(story).some((id) => getW(id)?.show === storyShowFilter))
   }, [hotStories, storyShowFilter])
+  const weeklyPrsMovers = useMemo(
+    () => buildWeeklyPRSChanges(wrestlers, matches, currentDate)
+      .sort((a, b) => {
+        const absDiff = Math.abs(b.delta) - Math.abs(a.delta)
+        if (absDiff !== 0) return absDiff
+        return a.name.localeCompare(b.name)
+      })
+      .slice(0, 5),
+    [wrestlers, matches, currentDate]
+  )
 
   const brandPulse = useMemo(
     () =>
@@ -196,6 +222,18 @@ export default function Dashboard({ state }) {
       return teams.join(' vs ')
     }
     return participantNames.join(' vs ')
+  }
+
+  const getWinnerLabel = (match) => {
+    if (!match?.winnerId) return 'Pending result'
+    const teams = getTeamsFromMatch(match)
+    if (teams) {
+      const winningTeam = teams.find((team) => team.includes(match.winnerId))
+      if (winningTeam) {
+        return `${winningTeam.map((id) => getW(id)?.name || 'Unknown').join(' / ')} won`
+      }
+    }
+    return `${getW(match.winnerId)?.name || 'Unknown'} won`
   }
 
   function getStoryParticipantName(participant) {
@@ -355,11 +393,11 @@ export default function Dashboard({ state }) {
                   <div key={match.id} className="dashboard-result-card">
                     <div className="dashboard-result-topline">
                       <span className="dashboard-match-type">{match.matchType || 'Match'}</span>
-                      <span className="dashboard-result-date">{match.date}</span>
+                      <span className="dashboard-result-date">{formatUniverseDate(match.date)}</span>
                     </div>
                     <div className="dashboard-result-title">{renderMatchLabel(match)}</div>
                     <div className="dashboard-result-footer">
-                      <span className="dashboard-result-winner">{winner ? `${winner.name} won` : 'Pending result'}</span>
+                      <span className="dashboard-result-winner">{getWinnerLabel(match)}</span>
                       {match.stipulation && <span className="dashboard-badge dashboard-badge-muted">{match.stipulation}</span>}
                     </div>
                   </div>
@@ -508,6 +546,38 @@ export default function Dashboard({ state }) {
 
         <div className="dashboard-panel">
           <div className="dashboard-panel-header">
+            <div className="dashboard-panel-heading">PRS Movers This Week</div>
+            <div className="dashboard-panel-count">{weeklyPrsMovers.length} tracked</div>
+          </div>
+          {weeklyPrsMovers.length === 0 ? (
+            <div className="dashboard-empty-state">No PRS movement yet this week.</div>
+          ) : (
+            <div className="dashboard-list">
+              {weeklyPrsMovers.map((row) => (
+                <div key={row.id} className="dashboard-ranking-row">
+                  <div className="dashboard-ranking-rank">{row.delta > 0 ? 'UP' : 'DN'}</div>
+                  <div className="dashboard-list-main">
+                    <div className="dashboard-list-title">{row.name}</div>
+                    <div className="dashboard-list-subtle">{row.show} • PRS {Math.round(row.previousPrs)} → {Math.round(row.currentPrs)}</div>
+                  </div>
+                  <span
+                    className="dashboard-badge"
+                    style={{
+                      background: row.delta > 0 ? 'rgba(39, 174, 96, 0.16)' : 'rgba(52, 152, 219, 0.16)',
+                      color: row.delta > 0 ? '#73e2a7' : '#8ed0ff',
+                      borderColor: row.delta > 0 ? 'rgba(39, 174, 96, 0.35)' : 'rgba(52, 152, 219, 0.35)',
+                    }}
+                  >
+                    {row.delta > 0 ? '+' : ''}{Math.round(row.delta)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dashboard-panel">
+          <div className="dashboard-panel-header">
             <div className="dashboard-panel-heading">Match Ratings</div>
             <div className="dashboard-panel-count">{ratingSummary.ratedCount} rated</div>
           </div>
@@ -523,7 +593,7 @@ export default function Dashboard({ state }) {
                 <div key={match.id} className="dashboard-result-card">
                   <div className="dashboard-result-topline">
                     <span className="dashboard-match-type">{match.matchType || 'Match'}</span>
-                    <span className="dashboard-result-date">{match.date}</span>
+                    <span className="dashboard-result-date">{formatUniverseDate(match.date)}</span>
                   </div>
                   <div className="dashboard-result-title">{renderMatchLabel(match)}</div>
                   <div className="dashboard-result-footer">

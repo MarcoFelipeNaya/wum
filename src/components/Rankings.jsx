@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { buildRankings } from '../utils/rankings.js'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faFire } from '@fortawesome/free-solid-svg-icons'
+import { faFire, faSnowflake } from '@fortawesome/free-solid-svg-icons'
 import './Rankings.css'
 
 function getWinPctClass(winPct) {
@@ -13,10 +13,10 @@ function getWinPctClass(winPct) {
 }
 
 function getStreakClass(streak) {
-  if (streak >= 5) return 'rankings-stat rankings-stat-fire'
+  if (streak >= 4) return 'rankings-stat rankings-stat-fire'
   if (streak >= 3) return 'rankings-stat rankings-stat-elite'
   if (streak > 0) return 'rankings-stat rankings-stat-strong'
-  if (streak <= -3) return 'rankings-stat rankings-stat-cold'
+  if (streak <= -4) return 'rankings-stat rankings-stat-cold'
   if (streak < 0) return 'rankings-stat rankings-stat-danger'
   return 'rankings-stat rankings-stat-neutral'
 }
@@ -53,6 +53,24 @@ export default function Rankings({ state }) {
 
         if (sortBy === 'winPct') {
           if (a.winPct !== b.winPct) return (a.winPct - b.winPct) * direction
+          if (a.prs !== b.prs) return (a.prs - b.prs) * direction
+          return a.name.localeCompare(b.name)
+        }
+
+        if (sortBy === 'matches') {
+          if (a.matches !== b.matches) return (a.matches - b.matches) * direction
+          if (a.prs !== b.prs) return (a.prs - b.prs) * direction
+          return a.name.localeCompare(b.name)
+        }
+
+        if (sortBy === 'streak') {
+          if (a.streak !== b.streak) return (a.streak - b.streak) * direction
+          if (a.prs !== b.prs) return (a.prs - b.prs) * direction
+          return a.name.localeCompare(b.name)
+        }
+
+        if (sortBy === 'titles') {
+          if (a.titles !== b.titles) return (a.titles - b.titles) * direction
           if (a.prs !== b.prs) return (a.prs - b.prs) * direction
           return a.name.localeCompare(b.name)
         }
@@ -156,9 +174,21 @@ export default function Rankings({ state }) {
                   </button>
                 </th>
                 <th>Record</th>
-                <th>Matches</th>
-                <th>Streak</th>
-                <th>Titles</th>
+                <th>
+                  <button type="button" className={`rankings-sort-btn${sortBy === 'matches' ? ' active' : ''}`} onClick={() => toggleSort('matches')}>
+                    Matches{getSortLabel('matches')}
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className={`rankings-sort-btn${sortBy === 'streak' ? ' active' : ''}`} onClick={() => toggleSort('streak')}>
+                    Streak{getSortLabel('streak')}
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className={`rankings-sort-btn${sortBy === 'titles' ? ' active' : ''}`} onClick={() => toggleSort('titles')}>
+                    Titles{getSortLabel('titles')}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -182,7 +212,8 @@ export default function Rankings({ state }) {
                   <td>{row.matches}</td>
                   <td>
                     <span className={getStreakClass(row.streak)}>
-                      {row.streak >= 5 && <FontAwesomeIcon icon={faFire} className="rankings-stat-icon" />}
+                      {row.streak >= 4 && <FontAwesomeIcon icon={faFire} className="rankings-stat-icon" />}
+                      {row.streak <= -4 && <FontAwesomeIcon icon={faSnowflake} className="rankings-stat-icon" />}
                       {row.streak > 0 ? `+${row.streak}` : row.streak}
                     </span>
                   </td>

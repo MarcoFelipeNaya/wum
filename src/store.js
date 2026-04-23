@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { fmt, addDays, DAY_NAMES, todayStr, getCustomDow, daysBetween } from './utils/dates.js'
+import { fmt, addDays, todayStr, daysBetween } from './utils/dates.js'
+import { getCalendarEventsOnDate, getDefaultCalendarEventId, resolveCalendarEventId } from './utils/calendarEvents.js'
 import {
   loadPrimaryState,
   savePrimaryState,
@@ -55,18 +56,8 @@ function normalizeSpecialShow(specialShow, defaultYear = parseDateParts(todayStr
   }
 }
 
-function specialShowOccursOnDate(specialShow, dateStr) {
-  if (!specialShow) return false
-  const safeDate = fmt(dateStr)
-  if (specialShow.type === 'one_off') return specialShow.oneOffDate === safeDate
-  const { year, month, day } = parseDateParts(safeDate)
-  return year >= specialShow.startYear && month === specialShow.month && day === specialShow.day
-}
-
 function hasAnyShowOnDate(dateStr, shows, specialShows = []) {
-  const dow = getCustomDow(dateStr)
-  if (shows.some((s) => s.day === DAY_NAMES[dow])) return true
-  return specialShows.some((specialShow) => specialShowOccursOnDate(specialShow, dateStr))
+  return getCalendarEventsOnDate(dateStr, shows, specialShows).length > 0
 }
 
 function normalizeCurrentDate(currentDate, shows, specialShows = []) {
@@ -99,31 +90,19 @@ function pruneStoriesByParticipantType(stories = [], removedType) {
     .filter((story) => (story.participants || []).length >= 2)
 }
 
-function getNextCardOrderForDate(date, matches = [], stories = [], standaloneSegments = []) {
-  const safeDate = fmt(date)
-  const matchOrders = matches.filter((match) => fmt(match.date) === safeDate).map((match) => Number(match.cardOrder) || 0)
-  const segmentOrders = stories.flatMap((story) =>
-    (story.segments || [])
-      .filter((segment) => fmt(segment.date) === safeDate)
-      .map((segment) => Number(segment.cardOrder) || 0)
-  )
-  const standaloneOrders = standaloneSegments
-    .filter((segment) => fmt(segment.date) === safeDate)
-    .map((segment) => Number(segment.cardOrder) || 0)
-  const existingOrders = [...matchOrders, ...segmentOrders, ...standaloneOrders]
-  if (existingOrders.length === 0) return 1
-  return Math.min(...existingOrders) - 1
-}
-
 function getValidCardOrder(value) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-function buildDayCardEntries(state, date) {
-  const safeDate = fmt(date)
+function getResolvedItemEventId(item, state) {
+  return resolveCalendarEventId(item?.eventId, item?.date, state.shows, state.specialShows)
+}
+
+function buildEventCardEntries(state, eventId) {
+  if (!eventId) return []
   const dayMatches = state.matches
-    .filter((match) => fmt(match.date) === safeDate)
+    .filter((match) => getResolvedItemEventId(match, state) === eventId)
     .map((match, index) => ({
       kind: 'match',
       key: `match:${match.id}`,
@@ -139,14 +118,14 @@ function buildDayCardEntries(state, date) {
         storyId: story.id,
         segmentId: segment.id,
         segmentIndex: index,
-        date: fmt(segment.date),
+        eventId: getResolvedItemEventId(segment, state),
         effectiveOrder: getValidCardOrder(segment.cardOrder) ?? dayMatches.length + index + 1,
       }))
-      .filter((segment) => segment.date === safeDate)
+      .filter((segment) => segment.eventId === eventId)
   )
 
   const dayStandaloneSegments = (state.standaloneSegments || [])
-    .filter((segment) => fmt(segment.date) === safeDate)
+    .filter((segment) => getResolvedItemEventId(segment, state) === eventId)
     .map((segment, index) => ({
       kind: 'segment',
       key: `segment:${segment.id ?? `standalone:${index}`}`,
@@ -160,37 +139,37 @@ function buildDayCardEntries(state, date) {
     .sort((a, b) => a.effectiveOrder - b.effectiveOrder)
 }
 
-function applyDayCardOrder(state, date, orderedEntries) {
-  const safeDate = fmt(date)
+function applyEventCardOrder(state, eventId, orderedEntries) {
+  if (!eventId) return
   const nextOrderMap = new Map(
     orderedEntries.map((entry, index) => [entry.key, index + 1])
   )
 
   state.matches = state.matches.map((match) => {
-    if (fmt(match.date) !== safeDate) return match
+    if (getResolvedItemEventId(match, state) !== eventId) return match
     const nextOrder = nextOrderMap.get(`match:${match.id}`)
-    return nextOrder ? { ...match, cardOrder: nextOrder } : match
+    return nextOrder ? { ...match, eventId, cardOrder: nextOrder } : match
   })
 
   state.stories = state.stories.map((story) => ({
     ...story,
     segments: (story.segments || []).map((segment, index) => {
-      if (fmt(segment.date) !== safeDate) return segment
+      if (getResolvedItemEventId(segment, state) !== eventId) return segment
       const nextOrder = nextOrderMap.get(`segment:${segment.id ?? `${story.id}:${index}`}`)
-      return nextOrder ? { ...segment, cardOrder: nextOrder } : segment
+      return nextOrder ? { ...segment, eventId, cardOrder: nextOrder } : segment
     }),
   }))
 
   state.standaloneSegments = (state.standaloneSegments || []).map((segment, index) => {
-    if (fmt(segment.date) !== safeDate) return segment
+    if (getResolvedItemEventId(segment, state) !== eventId) return segment
     const nextOrder = nextOrderMap.get(`segment:${segment.id ?? `standalone:${index}`}`)
-    return nextOrder ? { ...segment, cardOrder: nextOrder } : segment
+    return nextOrder ? { ...segment, eventId, cardOrder: nextOrder } : segment
   })
 }
 
-function prependDayCardEntry(state, date, entryKey) {
-  const existingEntries = buildDayCardEntries(state, date).filter((entry) => entry.key !== entryKey)
-  applyDayCardOrder(state, date, [{ key: entryKey }, ...existingEntries])
+function prependEventCardEntry(state, eventId, entryKey) {
+  const existingEntries = buildEventCardEntries(state, eventId).filter((entry) => entry.key !== entryKey)
+  applyEventCardOrder(state, eventId, [{ key: entryKey }, ...existingEntries])
 }
 
 function getParticipantIds(match) {
@@ -457,23 +436,26 @@ function getTitleChampionCount(title) {
 const today = todayStr()
 
 const INITIAL_SHOWS = [
-  { id: 1, name: 'Raw', color: '#c0392b', day: 'Monday' },
-  { id: 2, name: 'SmackDown', color: '#2980b9', day: 'Friday' },
+  { id: 101, name: 'Inferno', color: '#ff5a36', day: 'Monday' },
+  { id: 102, name: 'Skyline', color: '#3aa7ff', day: 'Wednesday' },
+  { id: 103, name: 'Riot Hour', color: '#ff9a2f', day: 'Friday' },
 ]
 
 const INITIAL_STATE = {
   wrestlers: [
-    { id: 1, name: 'The Viper', show: 'Raw', align: 'Heel', wins: 12, losses: 4 },
-    { id: 2, name: 'Iron Hawk', show: 'SmackDown', align: 'Face', wins: 18, losses: 7 },
-    { id: 3, name: 'Lady Storm', show: 'Raw', align: 'Face', wins: 9, losses: 5 },
-    { id: 4, name: 'The Crusher', show: 'SmackDown', align: 'Heel', wins: 6, losses: 11 },
-    { id: 5, name: 'Midnight Dragon', show: 'Raw', align: 'Neutral', wins: 15, losses: 6 },
-    { id: 6, name: 'Golden Flash', show: 'SmackDown', align: 'Face', wins: 20, losses: 8 },
+    { id: 1, name: 'Ash Calder', show: 'Inferno', align: 'Face', gender: 'Male', status: 'Active', role: 'wrestler', wins: 19, losses: 6, draws: 0, streak: 2 },
+    { id: 2, name: 'Nova Vale', show: 'Inferno', align: 'Face', gender: 'Female', status: 'Active', role: 'wrestler', wins: 15, losses: 7, draws: 0, streak: 1 },
+    { id: 3, name: 'Orion Rush', show: 'Skyline', align: 'Face', gender: 'Male', status: 'Active', role: 'wrestler', wins: 23, losses: 5, draws: 0, streak: 4 },
+    { id: 4, name: 'Selene Riot', show: 'Skyline', align: 'Face', gender: 'Female', status: 'Active', role: 'wrestler', wins: 20, losses: 6, draws: 0, streak: 2 },
+    { id: 5, name: 'Talia Prism', show: 'Riot Hour', align: 'Face', gender: 'Female', status: 'Active', role: 'wrestler', wins: 22, losses: 8, draws: 0, streak: 5 },
+    { id: 6, name: 'Knox Torrent', show: 'Riot Hour', align: 'Heel', gender: 'Male', status: 'Active', role: 'wrestler', wins: 17, losses: 10, draws: 0, streak: 2 },
   ],
   shows: INITIAL_SHOWS,
   titles: [
-    { id: 1, name: 'World Heavyweight Championship', show: 'Universe', type: 'singles', champId: 2, champIds: [2], champSince: today, history: [] },
-    { id: 2, name: 'Tag Team Championship', show: 'Raw', type: 'tag', champId: null, champIds: [], champSince: null, history: [] },
+    { id: 501, name: 'Heat World Championship', show: 'Universe', type: 'singles', champId: 3, champIds: [3], champSince: today, history: [] },
+    { id: 502, name: 'Inferno Crown Championship', show: 'Inferno', type: 'singles', champId: 1, champIds: [1], champSince: today, history: [] },
+    { id: 503, name: 'Skyline Signal Championship', show: 'Skyline', type: 'singles', champId: 4, champIds: [4], champSince: today, history: [] },
+    { id: 504, name: 'Riot Hour Grand Championship', show: 'Riot Hour', type: 'singles', champId: 5, champIds: [5], champSince: today, history: [] },
   ],
   factions: [],
   teams: [],
@@ -482,8 +464,20 @@ const INITIAL_STATE = {
   stories: [],
   standaloneSegments: [],
   tournaments: [],
-  nextId: 100,
+  nextId: 600,
   currentDate: normalizeCurrentDate(today, INITIAL_SHOWS, []),
+}
+
+async function loadDemoInitialState() {
+  try {
+    const response = await fetch('/demo-universe.json', { cache: 'no-store' })
+    if (!response.ok) throw new Error('Could not load demo universe')
+    const parsed = await response.json()
+    const incomingState = ['wum', 'heat'].includes(parsed?.app) && parsed?.state ? parsed.state : parsed
+    return normalizeStoredState(incomingState)
+  } catch {
+    return INITIAL_STATE
+  }
 }
 
 function normalizeStoredState(rawState) {
@@ -511,12 +505,14 @@ function normalizeStoredState(rawState) {
   parsed.currentDate = normalizeCurrentDate(parsed.currentDate, parsed.shows, parsed.specialShows)
 
   parsed.matches = parsed.matches.map((m) => {
+    const safeDate = fmt(m.date)
     const participantIds = getParticipantIds(m)
     const mode = normalizeMode(participantIds.length, m.mode || 'free_for_all')
 
     return {
       ...m,
-      date: fmt(m.date),
+      date: safeDate,
+      eventId: resolveCalendarEventId(m.eventId, safeDate, parsed.shows, parsed.specialShows),
       participantIds,
       mode,
       matchType: m.matchType || getMatchType(participantIds, mode),
@@ -549,22 +545,26 @@ function normalizeStoredState(rawState) {
   parsed.stories = (parsed.stories || []).map((story) => ({
     ...story,
     segments: (story.segments || []).map((seg, index) => ({
+      ...seg,
       id: seg.id ?? `legacy-seg-${story.id}-${index}`,
       title: seg.title || seg.type || 'Segment',
+      date: fmt(seg.date),
+      eventId: resolveCalendarEventId(seg.eventId, fmt(seg.date), parsed.shows, parsed.specialShows),
       segmentType: seg.segmentType || seg.type || null,
       wrestlerIds: seg.wrestlerIds || [],
       cardOrder: Number(seg.cardOrder) || 0,
-      ...seg,
     })),
   }))
 
   parsed.standaloneSegments = (parsed.standaloneSegments || []).map((seg, index) => ({
+    ...seg,
     id: seg.id ?? `standalone-seg-${index}`,
     title: seg.title || seg.type || 'Segment',
+    date: fmt(seg.date),
+    eventId: resolveCalendarEventId(seg.eventId, fmt(seg.date), parsed.shows, parsed.specialShows),
     segmentType: seg.segmentType || seg.type || null,
     wrestlerIds: seg.wrestlerIds || [],
     cardOrder: Number(seg.cardOrder) || 0,
-    ...seg,
   }))
 
   parsed.tournaments = (parsed.tournaments || []).map((tournament) => recalculateTournamentBracket({
@@ -691,6 +691,10 @@ export function useStore() {
               migratedFromLocalStorage = true
             }
           } catch {}
+
+          if (!normalized) {
+            normalized = await loadDemoInitialState()
+          }
         }
 
         const safeState = normalized || INITIAL_STATE
@@ -749,10 +753,12 @@ export function useStore() {
     const safeDate = fmt(date)
     const safeMode = normalizeMode(participantIds.length, mode)
     const id = genId(s)
+    const eventId = resolveCalendarEventId(extra.eventId, safeDate, s.shows, s.specialShows)
 
     return {
       id,
       date: safeDate,
+      eventId,
       participantIds,
       winnerId: null,
       titleId,
@@ -1006,11 +1012,11 @@ export function useStore() {
 
     const matchRecord = createMatchRecord(s, date, safeParticipants, titleId, mode, notes, stipulation, extra)
     s.matches = [...s.matches, matchRecord]
-    prependDayCardEntry(s, date, `match:${matchRecord.id}`)
+    prependEventCardEntry(s, matchRecord.eventId, `match:${matchRecord.id}`)
     return s
   })
 
-  const bookTournamentMatch = (tournamentId, roundIndex, matchId, date) => update((s) => {
+  const bookTournamentMatch = (tournamentId, roundIndex, matchId, date, eventId = null) => update((s) => {
     const tournament = (s.tournaments || []).find((item) => item.id === tournamentId)
     if (!tournament) return s
 
@@ -1034,11 +1040,11 @@ export function useStore() {
       mode,
       notes,
       '',
-      { tournamentId, tournamentRoundIndex: roundIndex, tournamentMatchId: matchId }
+      { tournamentId, tournamentRoundIndex: roundIndex, tournamentMatchId: matchId, eventId }
     )
 
     s.matches = [...s.matches, matchRecord]
-    prependDayCardEntry(s, date, `match:${matchRecord.id}`)
+    prependEventCardEntry(s, matchRecord.eventId, `match:${matchRecord.id}`)
     s.tournaments = (s.tournaments || []).map((item) => (
       item.id !== tournamentId
         ? item
@@ -1072,6 +1078,7 @@ export function useStore() {
               notes: (data.notes ?? m.notes ?? '').trim(),
               stipulation: (data.stipulation ?? m.stipulation ?? '').trim(),
               storyId: data.storyId ?? m.storyId ?? null,
+              eventId: resolveCalendarEventId(data.eventId ?? m.eventId, m.date, s.shows, s.specialShows),
             }
           : m
       )
@@ -1095,6 +1102,7 @@ export function useStore() {
             notes: (data.notes ?? m.notes ?? '').trim(),
             stipulation: (data.stipulation ?? m.stipulation ?? '').trim(),
             storyId: data.storyId ?? m.storyId ?? null,
+            eventId: resolveCalendarEventId(data.eventId ?? m.eventId, m.date, s.shows, s.specialShows),
           }
         : m
     )
@@ -1351,6 +1359,7 @@ export function useStore() {
     const normalized = {
       id: genId(s),
       date: segmentDate,
+      eventId: resolveCalendarEventId(segment.eventId, segmentDate, s.shows, s.specialShows),
       title: segment.title || segment.type || 'Segment',
       description: segment.description || '',
       segmentType: segment.segmentType || segment.type || null,
@@ -1361,7 +1370,7 @@ export function useStore() {
 
     if (!storyId) {
       s.standaloneSegments = [...(s.standaloneSegments || []), normalized]
-      prependDayCardEntry(s, segmentDate, `segment:${normalized.id}`)
+      prependEventCardEntry(s, normalized.eventId, `segment:${normalized.id}`)
       return s
     }
 
@@ -1372,13 +1381,14 @@ export function useStore() {
         segments: [...(story.segments || []), normalized],
       }
     })
-    prependDayCardEntry(s, segmentDate, `segment:${normalized.id}`)
+    prependEventCardEntry(s, normalized.eventId, `segment:${normalized.id}`)
     return s
   })
 
   const updateSegment = (storyId, segmentIndex, segmentId = null, data = {}) => update((s) => {
     const applySegmentUpdate = (segment) => ({
       ...segment,
+      eventId: resolveCalendarEventId(data.eventId ?? segment.eventId, data.date ?? segment.date, s.shows, s.specialShows),
       title: (data.title ?? segment.title ?? segment.type ?? 'Segment').trim(),
       description: (data.description ?? segment.description ?? '').trim(),
       segmentType: data.segmentType ?? segment.segmentType ?? segment.type ?? null,
@@ -1424,8 +1434,8 @@ export function useStore() {
     return s
   })
 
-  const moveDayCardItem = (date, item, direction) => update((s) => {
-    const ordered = buildDayCardEntries(s, date)
+  const moveDayCardItem = (eventId, item, direction) => update((s) => {
+    const ordered = buildEventCardEntries(s, eventId)
 
     const currentIndex = ordered.findIndex((entry) =>
       item.kind === 'match'
@@ -1443,12 +1453,12 @@ export function useStore() {
     const reordered = [...ordered]
     const [movedItem] = reordered.splice(currentIndex, 1)
     reordered.splice(swapIndex, 0, movedItem)
-    applyDayCardOrder(s, date, reordered)
+    applyEventCardOrder(s, eventId, reordered)
     return s
   })
 
-  const reorderDayCardItem = (date, draggedItem, targetItem) => update((s) => {
-    const ordered = buildDayCardEntries(s, date)
+  const reorderDayCardItem = (eventId, draggedItem, targetItem) => update((s) => {
+    const ordered = buildEventCardEntries(s, eventId)
 
     const matchesEntry = (entry, item) => (
       item.kind === 'match'
@@ -1466,7 +1476,7 @@ export function useStore() {
     const reordered = [...ordered]
     const [movedItem] = reordered.splice(fromIndex, 1)
     reordered.splice(toIndex, 0, movedItem)
-    applyDayCardOrder(s, date, reordered)
+    applyEventCardOrder(s, eventId, reordered)
     return s
   })
 

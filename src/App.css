@@ -8,12 +8,20 @@
   flex: 1;
   padding: 24px;
   overflow: auto;
-  max-width: 1200px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
 }
 
+@media (max-width: 900px) {
+  .app-main {
+    padding: 18px;
+  }
+}
+
 @media (max-width: 640px) {
-  .app-main { padding: 14px; }
+  .app-main {
+    padding: 14px 12px 18px;
+  }
 }

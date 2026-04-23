@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { addDays, DAY_NAMES, fmt, getCustomDow } from '../utils/dates.js'
+import { addDays, DAY_NAMES, fmt, getCustomDow, MONTHS_FULL, parseDate, formatUniverseDate } from '../utils/dates.js'
+import { getCalendarEventById, getCalendarEventsOnDate, specialShowOccursOnDate } from '../utils/calendarEvents.js'
 import './Tournaments.css'
 
 const PARTICIPANT_OPTIONS = [4, 8, 16, 32, 64]
@@ -18,13 +19,6 @@ const DEFAULT_FORM = {
   brandFilter: 'all',
 }
 
-function specialShowOccursOnDate(specialShow, dateStr) {
-  const safeDate = fmt(dateStr)
-  if (specialShow.type === 'one_off') return specialShow.oneOffDate === safeDate
-  const [, year, month, day] = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(safeDate) || []
-  return Number(year) >= specialShow.startYear && Number(month) === specialShow.month && Number(day) === specialShow.day
-}
-
 function getTournamentTypeLabel(matchType) {
   if (matchType === 'tag') return 'Tag Teams'
   if (matchType === 'trios') return 'Trios'
@@ -33,6 +27,23 @@ function getTournamentTypeLabel(matchType) {
 
 function getEntryShow(entry) {
   return entry.show || 'Universe'
+}
+
+function formatTournamentBookingLabel(dateStr, showNames) {
+  return `${formatUniverseDate(dateStr, { includeYear: false })} - ${showNames.join(' / ')}`
+}
+
+function getTournamentBookingOptionLabel(option) {
+  if (!option?.date) return option?.label || ''
+  const rawLabel = String(option.label || '')
+  const showLabel = rawLabel
+    .replace(`${option.date} â€¢ `, '')
+    .replace(`${option.date} • `, '')
+    .replace(`${option.date} - `, '')
+    .trim()
+
+  if (!showLabel) return rawLabel
+  return formatTournamentBookingLabel(option.date, showLabel.split(' / ').map((name) => name.trim()).filter(Boolean))
 }
 
 export default function Tournaments({
@@ -177,6 +188,7 @@ export default function Tournaments({
       roundIndex,
       matchId,
       date: currentDate,
+      eventId: '',
     })
   }
 
@@ -194,10 +206,38 @@ export default function Tournaments({
       showToast('Choose a calendar date')
       return
     }
-    bookTournamentMatch(booking.tournamentId, booking.roundIndex, booking.matchId, booking.date)
+    if (!booking?.eventId) {
+      showToast('Choose which event card should host this tournament match')
+      return
+    }
+    bookTournamentMatch(booking.tournamentId, booking.roundIndex, booking.matchId, booking.date, booking.eventId)
     showToast('Tournament match booked to the calendar')
     setBooking(null)
   }
+
+  const bookingEventOptions = useMemo(() => {
+    if (!booking?.date) return []
+    const tournament = tournaments.find((item) => item.id === booking.tournamentId)
+    if (!tournament) return []
+
+    const relevantShows = tournament.scope === 'show'
+      ? shows.filter((show) => show.name === tournament.scopeShow)
+      : shows
+    const relevantShowIds = new Set(relevantShows.map((show) => show.id))
+    const relevantSpecialShows = specialShows.filter((specialShow) => relevantShowIds.has(specialShow.showId))
+
+    return getCalendarEventsOnDate(booking.date, relevantShows, relevantSpecialShows)
+  }, [booking, tournaments, shows, specialShows])
+
+  useEffect(() => {
+    if (!booking) return
+    if (bookingEventOptions.length === 0) return
+    setBooking((current) => {
+      if (!current) return current
+      if (bookingEventOptions.some((option) => option.id === current.eventId)) return current
+      return { ...current, eventId: bookingEventOptions[0].id }
+    })
+  }, [booking, bookingEventOptions])
 
   const TournamentCard = ({ tournament }) => {
     const champion = tournament.entries.find((entry) => entry.id === tournament.championEntryId) || null
@@ -533,6 +573,9 @@ export default function Tournaments({
                               const sideBLabel = getEntryLabel(tournament, match.sideBEntryId)
                               const winnerLabel = match.winnerEntryId ? getEntryLabel(tournament, match.winnerEntryId) : null
                               const bookedMatch = matches.find((calendarMatch) => calendarMatch.id === match.bookedMatchId) || null
+                              const bookedEvent = bookedMatch
+                                ? getCalendarEventById(bookedMatch.date, bookedMatch.eventId, shows, specialShows)
+                                : null
                               const canBook = Boolean(match.sideAEntryId && match.sideBEntryId && !match.winnerEntryId && !match.bookedMatchId)
 
                               return (
@@ -547,7 +590,12 @@ export default function Tournaments({
                                   )}
 
                                   {bookedMatch && !winnerLabel && (
-                                    <div className="tournament-result-subtle">Booked for {bookedMatch.date}</div>
+                                    <div className="tournament-booked-block">
+                                      <div className="tournament-booked-badge">Booked To Calendar</div>
+                                      <div className="tournament-result-subtle">
+                                        {bookedEvent ? `${bookedEvent.name} - ${formatUniverseDate(bookedMatch.date)}` : `Booked for ${formatUniverseDate(bookedMatch.date)}`}
+                                      </div>
+                                    </div>
                                   )}
 
                                   {!bookedMatch && !winnerLabel && !canBook && (
@@ -592,7 +640,7 @@ export default function Tournaments({
                     <div className="tournament-section-label">Quick Facts</div>
                     <div className="tournament-fact-row"><span>Winner</span><strong>{champion?.label || 'TBD'}</strong></div>
                     <div className="tournament-fact-row"><span>Prize</span><strong>{titles.find((title) => title.id === tournament.prizeTitleId)?.name || 'None'}</strong></div>
-                    <div className="tournament-fact-row"><span>Created</span><strong>{tournament.createdAt}</strong></div>
+                    <div className="tournament-fact-row"><span>Created</span><strong>{formatUniverseDate(tournament.createdAt)}</strong></div>
                     <div className="tournament-fact-row"><span>Status</span><strong>{tournament.status === 'complete' ? 'Complete' : 'Active'}</strong></div>
                   </div>
                 </div>
@@ -607,10 +655,24 @@ export default function Tournaments({
             <label>Calendar Date</label>
             <select value={booking.date} onChange={(e) => setBooking((current) => ({ ...current, date: e.target.value }))}>
               {bookingOptions.map((option) => (
-                <option key={option.date} value={option.date}>{option.label}</option>
+                <option key={option.date} value={option.date}>{getTournamentBookingOptionLabel(option)}</option>
               ))}
             </select>
           </div>
+
+          {bookingOptions.length > 0 && (
+            <div className="form-group">
+              <label>Event Card</label>
+              <select value={booking.eventId || ''} onChange={(e) => setBooking((current) => ({ ...current, eventId: e.target.value }))}>
+                <option value="">Choose an event card</option>
+                {bookingEventOptions.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.kind === 'special' ? `${event.name} Event (${event.brandName})` : event.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {bookingOptions.length === 0 && (
             <div className="tournament-helper-copy" style={{ marginBottom: 16 }}>

@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { formatUniverseDate } from '../utils/dates.js'
 import './Data.css'
 
 const RESET_ACTIONS = [
@@ -36,6 +37,14 @@ export default function Data({
   const [isLoadingDemo, setIsLoadingDemo] = useState(false)
   const [restoringSnapshotId, setRestoringSnapshotId] = useState(null)
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false)
+  const [pwaStatus, setPwaStatus] = useState({
+    supported: false,
+    registered: false,
+    installAvailable: false,
+    updateAvailable: false,
+    installed: false,
+    online: typeof navigator === 'undefined' ? true : navigator.onLine,
+  })
 
   const summary = useMemo(() => ({
     roster: state.wrestlers?.length || 0,
@@ -47,6 +56,66 @@ export default function Data({
     stories: state.stories?.length || 0,
     matches: state.matches?.length || 0,
   }), [state])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
+    const supported = 'serviceWorker' in navigator
+
+    setPwaStatus((current) => ({
+      ...current,
+      supported,
+      installed: Boolean(standalone),
+      online: navigator.onLine,
+    }))
+
+    let cancelled = false
+    if (supported) {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (cancelled) return
+        setPwaStatus((current) => ({
+          ...current,
+          registered: Boolean(registration),
+          updateAvailable: current.updateAvailable || Boolean(registration?.waiting),
+        }))
+      }).catch(() => {})
+    }
+
+    const handleInstallAvailable = (event) => {
+      setPwaStatus((current) => ({
+        ...current,
+        installAvailable: Boolean(event.detail?.available),
+      }))
+    }
+    const handleUpdateAvailable = () => {
+      setPwaStatus((current) => ({ ...current, updateAvailable: true }))
+    }
+    const handleInstalled = () => {
+      setPwaStatus((current) => ({
+        ...current,
+        installed: true,
+        installAvailable: false,
+      }))
+    }
+    const handleOnline = () => setPwaStatus((current) => ({ ...current, online: true }))
+    const handleOffline = () => setPwaStatus((current) => ({ ...current, online: false }))
+
+    window.addEventListener('heat-pwa-install-available', handleInstallAvailable)
+    window.addEventListener('heat-pwa-update-ready', handleUpdateAvailable)
+    window.addEventListener('appinstalled', handleInstalled)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('heat-pwa-install-available', handleInstallAvailable)
+      window.removeEventListener('heat-pwa-update-ready', handleUpdateAvailable)
+      window.removeEventListener('appinstalled', handleInstalled)
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const handleExport = () => {
     try {
@@ -255,6 +324,58 @@ export default function Data({
 
         <section className="data-card">
           <div className="data-card-header">
+            <div className="data-card-heading">Offline & App Status</div>
+            <div className="data-card-subtle">Track whether Heat is ready for install, offline use, and app-shell updates.</div>
+          </div>
+
+          <div className="data-status-grid">
+            <div className="data-status-tile">
+              <span>Network</span>
+              <strong>{pwaStatus.online ? 'Online' : 'Offline'}</strong>
+            </div>
+            <div className="data-status-tile">
+              <span>Service Worker</span>
+              <strong>{pwaStatus.registered ? 'Registered' : (pwaStatus.supported ? 'Not registered yet' : 'Unsupported')}</strong>
+            </div>
+            <div className="data-status-tile">
+              <span>Install Prompt</span>
+              <strong>{pwaStatus.installAvailable ? 'Available' : 'Not available'}</strong>
+            </div>
+            <div className="data-status-tile">
+              <span>App Mode</span>
+              <strong>{pwaStatus.installed ? 'Installed / Standalone' : 'Browser tab'}</strong>
+            </div>
+          </div>
+
+          <div className="data-note-list">
+            {!import.meta.env.PROD && (
+              <div className="data-note-row">
+                PWA install and offline behavior only activate on the production build. Use <code>npm run build</code> and <code>npm run preview</code> for local testing.
+              </div>
+            )}
+            {import.meta.env.PROD && !pwaStatus.registered && (
+              <div className="data-note-row">
+                The service worker has not taken control yet. Refresh once after the first production load if install/offline features do not appear immediately.
+              </div>
+            )}
+            {pwaStatus.registered && !pwaStatus.installAvailable && !pwaStatus.installed && (
+              <div className="data-note-row">
+                The browser is not offering install right now. Chrome may require a refresh, a little usage time, or may suppress the prompt if it was dismissed recently.
+              </div>
+            )}
+            {pwaStatus.updateAvailable && (
+              <div className="data-note-row">
+                A newer app shell is waiting. Use the update banner at the top of the app to refresh into the latest version.
+              </div>
+            )}
+            <div className="data-note-row">
+              PWA shell test marker: Heat local app shell v3.
+            </div>
+          </div>
+        </section>
+
+        <section className="data-card">
+          <div className="data-card-header">
             <div className="data-card-heading">Autosave Recovery</div>
             <div className="data-card-subtle">Rolling local snapshots stored in IndexedDB for safer recovery</div>
           </div>
@@ -280,7 +401,7 @@ export default function Data({
                     <div className="data-action-title">{snapshot.label || 'Autosave'}</div>
                     <div className="data-action-copy">
                       {formatSnapshotDate(snapshot.createdAt)}
-                      {snapshot.currentDate ? ` • Universe date ${snapshot.currentDate}` : ''}
+                      {snapshot.currentDate ? ` • Universe date ${formatUniverseDate(snapshot.currentDate)}` : ''}
                     </div>
                     <div className="data-chip-row">
                       <span className="data-chip">Roster {snapshot.counts?.roster ?? 0}</span>

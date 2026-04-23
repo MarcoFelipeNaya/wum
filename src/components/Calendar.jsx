@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import DayMatchesModal from './DayMatchesModal.jsx'
-import { DAY_NAMES, DAY_SHORT, MONTHS, MONTHS_FULL, fmt, todayStr } from '../utils/dates.js'
+import { DAY_SHORT, MONTHS, MONTHS_FULL, fmt, todayStr, formatUniverseDate } from '../utils/dates.js'
+import { getCalendarEventsOnDate, resolveCalendarEventId } from '../utils/calendarEvents.js'
 import './Calendar.css'
 
 const DAYS_PER_MONTH = 28
@@ -46,12 +47,6 @@ function getYearNum(dateStr) {
 
 function getCustomDow(dateStr) {
   return (getDayNum(dateStr) - 1) % 7
-}
-
-function specialShowOccursOnDate(specialShow, dateStr) {
-  const parts = parseParts(dateStr)
-  if (specialShow.type === 'one_off') return specialShow.oneOffDate === dateStr
-  return parts.year >= specialShow.startYear && parts.monthIndex + 1 === specialShow.month && parts.day === specialShow.day
 }
 
 export default function Calendar({
@@ -116,52 +111,53 @@ export default function Calendar({
 
   const getW = (id) => wrestlers.find((w) => w.id === id)
   const getT = (id) => titles.find((t) => t.id === id)
+  const getWinnerNames = (match, winnerId) => {
+    if (!winnerId) return []
+    const participantIds = Array.isArray(match?.participantIds) && match.participantIds.length > 0
+      ? match.participantIds
+      : [match?.w1, match?.w2].filter(Boolean)
 
-  const showsOnDate = (dateStr) => {
-    const dow = getCustomDow(dateStr)
-    const weeklyShows = shows
-      .filter((show) => show.day === DAY_NAMES[dow])
-      .map((show) => ({ ...show, kind: 'weekly', brandName: show.name }))
-    const eventShows = specialShows
-      .filter((specialShow) => specialShowOccursOnDate(specialShow, dateStr))
-      .map((specialShow) => {
-        const parentShow = shows.find((show) => show.id === specialShow.showId)
-        if (!parentShow) return null
-        return {
-          id: specialShow.id,
-          name: specialShow.name,
-          color: parentShow.color,
-          day: parentShow.day,
-          kind: 'special',
-          brandName: parentShow.name,
-          eventType: specialShow.type,
-        }
-      })
-      .filter(Boolean)
-    return [...weeklyShows, ...eventShows]
+    const buildTeams = () => {
+      if (match.mode === 'tag' && participantIds.length === 4) return [participantIds.slice(0, 2), participantIds.slice(2, 4)]
+      if (match.mode === 'trios' && participantIds.length === 6) return [participantIds.slice(0, 3), participantIds.slice(3, 6)]
+      if (match.mode === '3tag' && participantIds.length === 6) return [participantIds.slice(0, 2), participantIds.slice(2, 4), participantIds.slice(4, 6)]
+      if (match.mode === 'handicap' && participantIds.length >= 3 && participantIds.length <= 6) return [participantIds.slice(0, 1), participantIds.slice(1)]
+      return null
+    }
+
+    const teams = buildTeams()
+    if (teams) {
+      const winningTeam = teams.find((team) => team.includes(winnerId))
+      if (winningTeam) return winningTeam.map((id) => getW(id)?.name || 'Unknown')
+    }
+    return [getW(winnerId)?.name || '?']
   }
 
-  const isCurrentShowDay = (dateStr) => dateStr === safeCurrentDate && showsOnDate(dateStr).length > 0
+  const getEventsOnDate = (dateStr) => getCalendarEventsOnDate(dateStr, shows, specialShows)
+
+  const isCurrentShowDay = (dateStr) => dateStr === safeCurrentDate && getEventsOnDate(dateStr).length > 0
 
   const isLocked = (dateStr) => {
     if (dateStr > safeCurrentDate) return true
-    if (showsOnDate(dateStr).length === 0) return true
+    if (getEventsOnDate(dateStr).length === 0) return true
     return false
   }
 
-  const getSegmentsOnDate = (dateStr) => {
+  const getSegmentsOnDate = (dateStr, eventId = null) => {
     const result = []
     for (const story of stories) {
       for (let i = 0; i < (story.segments || []).length; i++) {
         const seg = story.segments[i]
-        if (seg.date === dateStr) {
+        const resolvedEventId = resolveCalendarEventId(seg.eventId, seg.date, shows, specialShows)
+        if (seg.date === dateStr && (!eventId || resolvedEventId === eventId)) {
           result.push({ ...seg, storyId: story.id, storyName: story.name, segmentIndex: i })
         }
       }
     }
     for (let i = 0; i < standaloneSegments.length; i += 1) {
       const seg = standaloneSegments[i]
-      if (seg.date === dateStr) {
+      const resolvedEventId = resolveCalendarEventId(seg.eventId, seg.date, shows, specialShows)
+      if (seg.date === dateStr && (!eventId || resolvedEventId === eventId)) {
         result.push({ ...seg, storyId: null, storyName: null, segmentIndex: i, standalone: true })
       }
     }
@@ -169,11 +165,11 @@ export default function Calendar({
   }
 
   const currentShowMatches = matches.filter((m) => m.date === safeCurrentDate)
-  const currentShowSegments = useMemo(() => getSegmentsOnDate(safeCurrentDate), [stories, standaloneSegments, safeCurrentDate])
+  const currentShowSegments = useMemo(() => getSegmentsOnDate(safeCurrentDate), [stories, standaloneSegments, safeCurrentDate, shows, specialShows])
   const visibleMonthStats = useMemo(() => {
-    const monthDates = Array.from({ length: DAYS_PER_MONTH }, (_, i) => makeDateStr(viewYear, viewMonth, i + 1))
-    return monthDates.reduce((acc, dateStr) => {
-      const dayShows = showsOnDate(dateStr)
+      const monthDates = Array.from({ length: DAYS_PER_MONTH }, (_, i) => makeDateStr(viewYear, viewMonth, i + 1))
+      return monthDates.reduce((acc, dateStr) => {
+      const dayShows = getEventsOnDate(dateStr)
       const dayMatches = matches.filter((match) => match.date === dateStr)
       const daySegments = getSegmentsOnDate(dateStr)
       acc.showDays += dayShows.length > 0 ? 1 : 0
@@ -183,25 +179,26 @@ export default function Calendar({
       return acc
     }, { showDays: 0, matches: 0, segments: 0, specials: 0 })
   }, [viewYear, viewMonth, matches, shows, specialShows, stories, standaloneSegments])
-  const currentDayShows = showsOnDate(safeCurrentDate)
+  const currentDayShows = getEventsOnDate(safeCurrentDate)
   const canAdvance =
     currentDayShows.length > 0 &&
     currentShowMatches.length > 0 &&
     currentShowMatches.every((m) => m.winnerId != null)
 
   const handleOpenDay = (dateStr) => {
-    if (!dateStr || dateStr > safeCurrentDate || showsOnDate(dateStr).length === 0) return
-    setDayModal(dateStr)
+    const dayEvents = getEventsOnDate(dateStr)
+    if (!dateStr || dateStr > safeCurrentDate || dayEvents.length === 0) return
+    setDayModal({ date: dateStr, eventId: dayEvents[0].id })
   }
 
-  const handleBookMatch = (date, participantIds, titleId, mode, notes, stipulation, extra = {}) => {
+  const handleBookMatch = (eventId, date, participantIds, titleId, mode, notes, stipulation, extra = {}) => {
     const competitiveIds = new Set(wrestlers.filter((w) => (w.role || 'wrestler') === 'wrestler').map((w) => w.id))
     const safeParticipants = [...new Set((participantIds || []).filter((id) => competitiveIds.has(id)))]
     if (![2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30].includes(safeParticipants.length)) {
       showToast('Participants must be 2 to 10, or 20 / 30 for Royal Rumble')
       return
     }
-    bookMatch(date, safeParticipants, titleId, mode, notes, stipulation, extra)
+    bookMatch(date, safeParticipants, titleId, mode, notes, stipulation, { ...extra, eventId })
     showToast('Match booked!')
   }
 
@@ -222,8 +219,9 @@ export default function Calendar({
   }
 
   const handleSetWinner = (matchId, winnerId, finishType) => {
+    const match = matches.find((m) => m.id === matchId)
     setWinner(matchId, winnerId, finishType)
-    showToast(`${getW(winnerId)?.name ?? '?'} wins!`)
+    showToast(`${match ? getWinnerNames(match, winnerId).join(' / ') : (getW(winnerId)?.name ?? '?')} wins!`)
   }
 
   const handleSetMatchRating = (matchId, rating) => {
@@ -253,7 +251,7 @@ export default function Calendar({
    * participants include any of the tagged wrestlers, falling back to a
    * "storyId" the modal can optionally pass.
    */
-  const handleBookSegment = (date, segmentData) => {
+  const handleBookSegment = (eventId, date, segmentData) => {
     if (!addSegment) {
       showToast('Segment saving not available')
       return
@@ -263,13 +261,13 @@ export default function Calendar({
 
     // If a specific story was chosen in the modal, use it
     if (storyId && storyId !== 'auto') {
-      addSegment(storyId, { date, title, description, segmentType, wrestlerIds })
+      addSegment(storyId, { date, eventId, title, description, segmentType, wrestlerIds })
       showToast('Segment booked!')
       return
     }
 
     if (!storyId) {
-      addSegment(null, { date, title, description, segmentType, wrestlerIds })
+      addSegment(null, { date, eventId, title, description, segmentType, wrestlerIds })
       showToast('Standalone segment booked!')
       return
     }
@@ -293,13 +291,13 @@ export default function Calendar({
     if (matched.length === 0) {
       // No matching story — save as a standalone note on the first active story,
       // or just toast a warning if there are no stories yet
-      addSegment(null, { date, title, description, segmentType, wrestlerIds })
+      addSegment(null, { date, eventId, title, description, segmentType, wrestlerIds })
       showToast('Segment booked as standalone')
       return
     }
 
     matched.forEach((story) => {
-      addSegment(story.id, { date, title, description, segmentType, wrestlerIds })
+      addSegment(story.id, { date, eventId, title, description, segmentType, wrestlerIds })
     })
 
     const names = matched.map((s) => s.name).join(', ')
@@ -316,12 +314,12 @@ export default function Calendar({
     showToast('Segment updated')
   }
 
-  const handleMoveDayCardItem = (date, item, direction) => {
-    if (moveDayCardItem) moveDayCardItem(date, item, direction)
+  const handleMoveDayCardItem = (eventId, item, direction) => {
+    if (moveDayCardItem) moveDayCardItem(eventId, item, direction)
   }
 
-  const handleReorderDayCardItem = (date, draggedItem, targetItem) => {
-    if (reorderDayCardItem) reorderDayCardItem(date, draggedItem, targetItem)
+  const handleReorderDayCardItem = (eventId, draggedItem, targetItem) => {
+    if (reorderDayCardItem) reorderDayCardItem(eventId, draggedItem, targetItem)
   }
 
   const monthLabel = `${(MONTHS_FULL || MONTHS)[viewMonth]} ${viewYear}`
@@ -332,7 +330,7 @@ export default function Calendar({
         <div className="calendar-hero-copy">
           <h1 className="page-title">Calendar</h1>
           <div className="calendar-hero-date">
-            Current show day: <span>{safeCurrentDate}</span>
+            Current show day: <span>{formatUniverseDate(safeCurrentDate)}</span>
           </div>
           <div className="calendar-live-row">
             {currentDayShows.length > 0 ? currentDayShows.map((show) => (
@@ -435,7 +433,7 @@ export default function Calendar({
 
       <div className="cal-month-grid" style={GRID_STYLE}>
         {cells.map((dateStr, i) => {
-          const dayShows = showsOnDate(dateStr)
+          const dayShows = getEventsOnDate(dateStr)
           const dayMatches = matches.filter((m) => m.date === dateStr)
           const daySegs = getSegmentsOnDate(dateStr)
           const titleMatchCount = dayMatches.filter((m) => m.titleId).length
@@ -492,17 +490,19 @@ export default function Calendar({
 
       {dayModal && (
         <DayMatchesModal
-          date={dayModal}
+          date={dayModal.date}
           titles={titles}
           wrestlers={wrestlers}
           stories={stories}
           teams={teams}
           factions={factions}
           showToast={showToast}
-          dayShows={showsOnDate(dayModal)}
-          dayMatches={matches.filter((m) => m.date === dayModal)}
-          daySegments={getSegmentsOnDate(dayModal)}
-          isCurrentDay={dayModal === safeCurrentDate}
+          dayEvents={getEventsOnDate(dayModal.date)}
+          selectedEventId={dayModal.eventId}
+          onSelectEvent={(eventId) => setDayModal((current) => current ? { ...current, eventId } : current)}
+          dayMatches={matches.filter((m) => m.date === dayModal.date && resolveCalendarEventId(m.eventId, m.date, shows, specialShows) === dayModal.eventId)}
+          daySegments={getSegmentsOnDate(dayModal.date, dayModal.eventId)}
+          isCurrentDay={dayModal.date === safeCurrentDate}
           getCustomDow={getCustomDow}
           getMonthIndex={getMonthIndex}
           getYearNum={getYearNum}

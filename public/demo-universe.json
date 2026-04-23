@@ -27,7 +27,10 @@
       { "id": 21, "name": "Eden Pike", "show": "Riot Hour", "align": "Face", "gender": "Female", "status": "Active", "role": "wrestler", "wins": 16, "losses": 7, "draws": 1, "streak": 1 },
       { "id": 22, "name": "Rune Mercer", "show": "Riot Hour", "align": "Heel", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 13, "losses": 12, "draws": 0, "streak": -1 },
       { "id": 23, "name": "Zara Voltage", "show": "Riot Hour", "align": "Heel", "gender": "Female", "status": "Active", "role": "wrestler", "wins": 15, "losses": 9, "draws": 0, "streak": -1 },
-      { "id": 24, "name": "Bram Hex", "show": "Riot Hour", "align": "Heel", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 10, "losses": 14, "draws": 0, "streak": -2 }
+      { "id": 24, "name": "Bram Hex", "show": "Riot Hour", "align": "Heel", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 10, "losses": 14, "draws": 0, "streak": -2 },
+      { "id": 25, "name": "Marrow Vale", "show": "Inferno", "align": "Heel", "gender": "Male", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 },
+      { "id": 26, "name": "Celine Prism", "show": "Riot Hour", "align": "Face", "gender": "Female", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 },
+      { "id": 27, "name": "Archer Grey", "show": "Skyline", "align": "Neutral", "gender": "Male", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 }
     ],
     "shows": [
       { "id": 101, "name": "Inferno", "color": "#ff5a36", "day": "Monday" },
@@ -124,7 +127,8 @@
       { "id": 301, "name": "Furnace Syndicate", "show": "Inferno", "memberIds": [1, 2, 5, 7], "leaderId": 1 },
       { "id": 302, "name": "Hollow Court", "show": "Inferno", "memberIds": [3, 6, 8], "leaderId": 3 },
       { "id": 303, "name": "Skyline Unit", "show": "Skyline", "memberIds": [10, 11, 12, 13], "leaderId": 10 },
-      { "id": 304, "name": "Prism Circuit", "show": "Riot Hour", "memberIds": [19, 20, 21, 22, 23, 24], "leaderId": 19 }
+      { "id": 304, "name": "Prism Circuit", "show": "Riot Hour", "memberIds": [19, 20, 21, 22, 23, 24, 26], "leaderId": 19 },
+      { "id": 305, "name": "Glass Theory", "show": "Skyline", "memberIds": [14, 16, 18, 27], "leaderId": 14 }
     ],
     "teams": [
       { "id": 201, "name": "Emberline", "show": "Inferno", "type": "tag", "memberIds": [1, 2], "factionId": 301 },
@@ -136,7 +140,8 @@
       { "id": 207, "name": "Storm Ledger", "show": "Riot Hour", "type": "tag", "memberIds": [19, 21], "factionId": 304 },
       { "id": 208, "name": "Voltage Theory", "show": "Riot Hour", "type": "tag", "memberIds": [20, 23], "factionId": 304 },
       { "id": 209, "name": "Furnace Line", "show": "Inferno", "type": "trio", "memberIds": [1, 7, 5], "factionId": 301 },
-      { "id": 210, "name": "Voltage Bloom", "show": "Riot Hour", "type": "trio", "memberIds": [19, 21, 23], "factionId": 304 }
+      { "id": 210, "name": "Voltage Bloom", "show": "Riot Hour", "type": "trio", "memberIds": [19, 21, 23], "factionId": 304 },
+      { "id": 211, "name": "Glass Halo", "show": "Skyline", "type": "trio", "memberIds": [14, 16, 17], "factionId": 305 }
     ],
     "specialShows": [
       { "id": 401, "showId": 101, "name": "Ashfall", "type": "annual", "month": 8, "day": 24, "startYear": 2026, "oneOffDate": null },
@@ -431,6 +436,78 @@
         "tournamentId": null,
         "tournamentRoundIndex": null,
         "tournamentMatchId": null
+      },
+      {
+        "id": 1017,
+        "date": "2026-07-30",
+        "participantIds": [5, 20],
+        "titleId": null,
+        "mode": "singles",
+        "matchType": "Singles",
+        "notes": "Flashpoint qualifier showcase",
+        "stipulation": "Last Chance",
+        "winnerId": 20,
+        "finishType": "Clean Pin",
+        "storyId": 606,
+        "rating": 5,
+        "cardOrder": 1,
+        "tournamentId": null,
+        "tournamentRoundIndex": null,
+        "tournamentMatchId": null
+      },
+      {
+        "id": 1018,
+        "date": "2026-08-20",
+        "participantIds": [14, 16, 17, 10, 11, 12],
+        "titleId": null,
+        "mode": "trios",
+        "matchType": "Six-Man Tag",
+        "notes": "Neon Summit main event",
+        "stipulation": "",
+        "winnerId": 14,
+        "finishType": "Interference",
+        "storyId": 605,
+        "rating": 4.5,
+        "cardOrder": 1,
+        "tournamentId": null,
+        "tournamentRoundIndex": null,
+        "tournamentMatchId": null
+      },
+      {
+        "id": 1019,
+        "date": "2026-08-28",
+        "participantIds": [19, 20],
+        "titleId": 504,
+        "mode": "singles",
+        "matchType": "Singles",
+        "notes": "Flashpoint title main event",
+        "stipulation": "Falls Count Anywhere",
+        "winnerId": null,
+        "finishType": "",
+        "storyId": 606,
+        "rating": null,
+        "cardOrder": 3,
+        "tournamentId": null,
+        "tournamentRoundIndex": null,
+        "tournamentMatchId": null
+      },
+      {
+        "id": 1020,
+        "date": "2026-08-28",
+        "participantIds": [21, 23, 22, 24],
+        "titleId": null,
+        "mode": "tag",
+        "matchType": "Tag Team",
+        "notes": "Flashpoint grudge match",
+        "stipulation": "",
+        "winnerId": null,
+        "finishType": "",
+        "storyId": 602,
+        "rating": null,
+        "cardOrder": 2,
+        "tournamentId": null,
+        "tournamentRoundIndex": null,
+        "tournamentMatchId": null
       }
     ],
     "stories": [
@@ -575,6 +652,72 @@
             "cardOrder": 2
           }
         ]
+      },
+      {
+        "id": 605,
+        "name": "Glass Skyline",
+        "show": "Skyline",
+        "status": "Active",
+        "description": "Glass Theory wants Skyline Unit stripped of brand control and is willing to bend every rule to do it.",
+        "participants": [
+          { "type": "faction", "id": 303 },
+          { "type": "faction", "id": 305 }
+        ],
+        "segments": [
+          {
+            "id": 6501,
+            "date": "2026-08-18",
+            "title": "Authority Draws the Line",
+            "description": "Archer Grey brokers a tense in-ring confrontation and promises the next six-person collision will settle who speaks for Skyline this season.",
+            "segmentType": "Authority Confrontation",
+            "wrestlerIds": [10, 11, 12, 14, 16, 17, 27],
+            "matchId": null,
+            "cardOrder": 1
+          },
+          {
+            "id": 6502,
+            "date": "2026-08-24",
+            "title": "Blue Light Break",
+            "description": "Glass Theory interrupts the Ashfall spotlight with a taped warning aimed directly at Orion Rush and Skyline Unit.",
+            "segmentType": "Taped Vignette",
+            "wrestlerIds": [10, 12, 14, 16, 17],
+            "matchId": null,
+            "cardOrder": 6
+          }
+        ]
+      },
+      {
+        "id": 606,
+        "name": "Flash Burn",
+        "show": "Riot Hour",
+        "status": "Concluded",
+        "description": "Knox Torrent outlasted Flint Mercer in a bitter summer scrap and now looks toward Flashpoint with title ambitions.",
+        "participants": [
+          { "type": "wrestler", "id": 20 },
+          { "type": "wrestler", "id": 5 }
+        ],
+        "segments": [
+          {
+            "id": 6601,
+            "date": "2026-07-25",
+            "title": "Medical Update",
+            "description": "Officials reveal Flint Mercer has not been cleared since the last backstage attack, but he still demands one more fight.",
+            "segmentType": "Medical Update",
+            "wrestlerIds": [5, 20],
+            "matchId": null,
+            "cardOrder": 1
+          },
+          {
+            "id": 6602,
+            "date": "2026-07-30",
+            "title": "Nothing Left To Prove",
+            "description": "Knox Torrent closes the rivalry after a brutal last chance match and points straight at the Riot Hour Grand Championship.",
+            "segmentType": "Celebration",
+            "wrestlerIds": [5, 20],
+            "matchId": 1017,
+            "cardOrder": 2
+          }
+        ]
       }
     ],
     "standaloneSegments": [
@@ -607,6 +750,26 @@
         "wrestlerIds": [],
         "matchId": null,
         "cardOrder": 1
+      },
+      {
+        "id": 9004,
+        "date": "2026-08-28",
+        "title": "Flashpoint Arrival",
+        "description": "A cinematic opening package frames Flashpoint as Riot Hour's reset button and teases a dangerous new challenger entering the brand.",
+        "segmentType": "Match Hype Package",
+        "wrestlerIds": [],
+        "matchId": null,
+        "cardOrder": 1
+      },
+      {
+        "id": 9005,
+        "date": "2026-08-28",
+        "title": "The Last Laugh",
+        "description": "Celine Prism hosts a final desk segment before the main event and forces both title challengers to look each other in the eye.",
+        "segmentType": "Talk Show Segment",
+        "wrestlerIds": [19, 20, 26],
+        "matchId": null,
+        "cardOrder": 4
       }
     ],
     "tournaments": [
@@ -658,7 +821,7 @@
         "createdAt": "2026-08-10"
       }
     ],
-    "nextId": 9501,
+    "nextId": 9506,
     "currentDate": "2026-08-24"
   }
 }

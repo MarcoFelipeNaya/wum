@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Nav from './components/Nav.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import Roster from './components/Roster.jsx'
@@ -17,11 +17,30 @@ import './App.css'
 
 export default function App() {
   const [page, setPage] = useState('dashboard')
+  const [pwaInstallAvailable, setPwaInstallAvailable] = useState(false)
+  const [pwaUpdateAvailable, setPwaUpdateAvailable] = useState(false)
   const { toast, showToast } = useToast()
   const store = useStore()
   const { state } = store
 
   const pageProps = { state, showToast, ...store }
+
+  useEffect(() => {
+    const handleInstallAvailable = (event) => {
+      setPwaInstallAvailable(Boolean(event.detail?.available))
+    }
+    const handleUpdateAvailable = () => {
+      setPwaUpdateAvailable(true)
+    }
+
+    window.addEventListener('heat-pwa-install-available', handleInstallAvailable)
+    window.addEventListener('heat-pwa-update-ready', handleUpdateAvailable)
+
+    return () => {
+      window.removeEventListener('heat-pwa-install-available', handleInstallAvailable)
+      window.removeEventListener('heat-pwa-update-ready', handleUpdateAvailable)
+    }
+  }, [])
 
   if (!store.isHydrated) {
     return (
@@ -47,6 +66,60 @@ export default function App() {
   return (
     <div className="app">
       <Nav current={page} onNavigate={setPage} />
+
+      {(pwaInstallAvailable || pwaUpdateAvailable) && (
+        <div className="pwa-banner-shell">
+          {pwaInstallAvailable && !pwaUpdateAvailable && (
+            <div className="pwa-banner">
+              <div>
+                <div className="pwa-banner-title">Install Heat</div>
+                <div className="pwa-banner-copy">Add Heat to your desktop so it launches like its own app.</div>
+              </div>
+              <div className="pwa-banner-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setPwaInstallAvailable(false)}
+                >
+                  Later
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => window.dispatchEvent(new CustomEvent('heat-pwa-trigger-install'))}
+                >
+                  Install
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pwaUpdateAvailable && (
+            <div className="pwa-banner">
+              <div>
+                <div className="pwa-banner-title">Heat Update Ready</div>
+                <div className="pwa-banner-copy">A newer local app shell is ready. Refresh once to switch over.</div>
+              </div>
+              <div className="pwa-banner-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setPwaUpdateAvailable(false)}
+                >
+                  Later
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => window.dispatchEvent(new CustomEvent('heat-pwa-apply-update'))}
+                >
+                  Refresh App
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <main className="app-main">
         {page === 'dashboard' && <Dashboard {...pageProps} />}

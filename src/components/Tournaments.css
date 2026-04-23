@@ -336,6 +336,27 @@
   font-weight: 700;
 }
 
+.tournament-booked-block {
+  margin: 10px 0 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.tournament-booked-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 90, 42, 0.16);
+  border: 1px solid rgba(255, 138, 29, 0.38);
+  color: var(--primary-light);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
 .tournament-fact-row {
   display: flex;
   justify-content: space-between;
