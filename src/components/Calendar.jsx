@@ -180,10 +180,14 @@ export default function Calendar({
     }, { showDays: 0, matches: 0, segments: 0, specials: 0 })
   }, [viewYear, viewMonth, matches, shows, specialShows, stories, standaloneSegments])
   const currentDayShows = getEventsOnDate(safeCurrentDate)
-  const canAdvance =
-    currentDayShows.length > 0 &&
-    currentShowMatches.length > 0 &&
-    currentShowMatches.every((m) => m.winnerId != null)
+  const incompleteCurrentMatches = currentShowMatches.filter((m) => m.winnerId == null)
+  const canAdvance = currentDayShows.length > 0 && incompleteCurrentMatches.length === 0
+  const advanceBlockedReason =
+    currentDayShows.length === 0
+      ? 'There is no active show on the current in-universe date.'
+      : incompleteCurrentMatches.length > 0
+      ? 'Set winners for every booked match on the current show day before advancing.'
+      : ''
 
   const handleOpenDay = (dateStr) => {
     const dayEvents = getEventsOnDate(dateStr)
@@ -230,6 +234,10 @@ export default function Calendar({
   }
 
   const handleAdvance = () => {
+    if (!canAdvance) {
+      showToast(advanceBlockedReason || 'This show day is not ready to advance yet.')
+      return
+    }
     advanceDay()
     setDayModal(null)
     showToast('Show complete! Advanced to next show day.')
@@ -353,8 +361,7 @@ export default function Calendar({
           <button
             className={`btn btn-primary advance-btn${canAdvance ? ' ready' : ''}`}
             onClick={handleAdvance}
-            disabled={!canAdvance}
-            title={!canAdvance ? 'Book at least 1 match and set all winners first' : 'Advance to next show'}
+            title={!canAdvance ? advanceBlockedReason : 'Advance to next show'}
           >
             Advance Show &gt;
           </button>

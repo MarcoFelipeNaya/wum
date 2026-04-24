@@ -528,6 +528,7 @@ export default function Stories({ state, addStory, editStory, deleteStory, addSe
   const [storyView, setStoryView] = useState('active')
   const [participantSearch, setParticipantSearch] = useState('')
   const [participantShowFilter, setParticipantShowFilter] = useState('all')
+  const [storyNameDraft, setStoryNameDraft] = useState('')
 
   const getWrestler = (id) => wrestlers.find((w) => w.id === id)
   const getFaction = (id) => factions.find((f) => f.id === id)
@@ -563,6 +564,7 @@ export default function Stories({ state, addStory, editStory, deleteStory, addSe
     setStoryType('rivalry')
     setParticipantSearch('')
     setParticipantShowFilter('all')
+    setStoryNameDraft('')
   }
 
   const handleSaveStory = (e) => {
@@ -593,10 +595,12 @@ export default function Stories({ state, addStory, editStory, deleteStory, addSe
     if (story) {
       setSelectedParticipants(story.participants)
       setStoryType(story.type)
+      setStoryNameDraft(story.name || '')
       setEditModal({ id: story.id })
     } else {
       setSelectedParticipants([])
       setStoryType('rivalry')
+      setStoryNameDraft('')
       setEditModal('add')
     }
     setParticipantSearch('')
@@ -700,7 +704,13 @@ export default function Stories({ state, addStory, editStory, deleteStory, addSe
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                         <div className="form-group">
                           <label>Name</label>
-                          <input name="name" defaultValue={story?.name ?? ''} placeholder="e.g., Championship Pursuit" autoFocus />
+                          <input
+                            name="name"
+                            defaultValue={story?.name ?? ''}
+                            onChange={(e) => setStoryNameDraft(e.target.value)}
+                            placeholder="e.g., Championship Pursuit"
+                            autoFocus
+                          />
                         </div>
                         <div className="form-group">
                           <label>Status</label>
@@ -787,7 +797,7 @@ export default function Stories({ state, addStory, editStory, deleteStory, addSe
                   <div className="story-form-side">
                     <div className="story-side-card" style={{ borderTop: '4px solid var(--primary)' }}>
                       <div className="story-section-heading" style={{ marginBottom: 12 }}>Preview</div>
-                      <div className="story-card-name" style={{ fontSize: 20 }}>{fd.get('name') || 'New Story/Rivalry'}</div>
+                      <div className="story-card-name" style={{ fontSize: 20 }}>{storyNameDraft.trim() || 'New Story/Rivalry'}</div>
                       <div className="story-badge" style={{ marginTop: 8, display: 'inline-block', background: 'var(--primary-dim)', color: 'var(--primary)' }}>{storyType}</div>
                     </div>
 

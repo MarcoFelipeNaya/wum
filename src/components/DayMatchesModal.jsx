@@ -217,12 +217,6 @@ function formatRatingValue(rating) {
   return Number.isInteger(rating) ? `${rating}.0` : String(rating)
 }
 
-function getStarIconForRating(rating, starIndex) {
-  if (rating >= starIndex) return faStarSolid
-  if (rating >= starIndex - 0.5) return faStarHalfStroke
-  return faStarRegular
-}
-
 function getDragPayload(item) {
   return item.kind === 'match'
     ? { kind: 'match', id: item.id }
@@ -247,12 +241,33 @@ function MatchRatingInput({ rating, disabled, onChange }) {
           return (
             <div key={starIndex} style={{ position: 'relative', width: 24, height: 24 }}>
               <FiStar
-                className={`star-icon ${isActive || isHalf ? 'active' : ''}`}
-                style={{ 
-                  color: isActive || isHalf ? 'var(--gold)' : 'var(--text3)',
-                  opacity: isActive || isHalf ? 1 : 0.2
+                className="star-icon"
+                style={{
+                  color: 'var(--text3)',
+                  opacity: 0.25,
+                  position: 'absolute',
+                  inset: 0,
                 }}
               />
+              {(isActive || isHalf) && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: isActive ? '100%' : '50%',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <FiStar
+                    className="star-icon active"
+                    style={{
+                      color: 'var(--gold)',
+                      position: 'absolute',
+                      inset: 0,
+                    }}
+                  />
+                </div>
+              )}
               <button
                 type="button"
                 disabled={disabled}
@@ -396,12 +411,17 @@ export default function DayMatchesModal({
   const [matchMode, setMatchMode] = useState('singles')
   const [editParticipantCount, setEditParticipantCount] = useState(2)
   const [editMatchMode, setEditMatchMode] = useState('singles')
+  const [bookingParticipantSelections, setBookingParticipantSelections] = useState(['', ''])
+  const [bookingSavedTeamSelections, setBookingSavedTeamSelections] = useState([])
+  const [editParticipantSelections, setEditParticipantSelections] = useState([])
+  const [editSavedTeamSelections, setEditSavedTeamSelections] = useState([])
   const [winnerFinishTypes, setWinnerFinishTypes] = useState({})
   const [draggedItem, setDraggedItem] = useState(null)
   const [dragOverKey, setDragOverKey] = useState(null)
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1400 : window.innerWidth))
   const dayCardRefs = useRef(new Map())
   const previousPositionsRef = useRef(new Map())
+  const previousOrderSignatureRef = useRef('')
 
   // Segment booking state
   const [segTitle, setSegTitle] = useState('')
@@ -448,9 +468,15 @@ export default function DayMatchesModal({
     }))
     return [...matches, ...segments].sort((a, b) => a.cardOrder - b.cardOrder)
   }, [dayMatches, daySegments])
+  const dayCardOrderSignature = useMemo(
+    () => dayCardItems.map((item) => `${getDayCardItemKey(item)}:${item.cardOrder}`).join('|'),
+    [dayCardItems]
+  )
 
   useLayoutEffect(() => {
     const nextPositions = new Map()
+    const previousSignature = previousOrderSignatureRef.current
+    const orderChanged = previousSignature && previousSignature !== dayCardOrderSignature
 
     dayCardItems.forEach((item) => {
       const key = getDayCardItemKey(item)
@@ -459,6 +485,8 @@ export default function DayMatchesModal({
 
       const nextRect = node.getBoundingClientRect()
       nextPositions.set(key, nextRect)
+
+      if (!orderChanged) return
 
       const previousRect = previousPositionsRef.current.get(key)
       if (!previousRect) return
@@ -477,7 +505,8 @@ export default function DayMatchesModal({
     })
 
     previousPositionsRef.current = nextPositions
-  }, [dayCardItems])
+    previousOrderSignatureRef.current = dayCardOrderSignature
+  }, [dayCardItems, dayCardOrderSignature])
 
   useEffect(() => {
     const nodes = Array.from(dayCardRefs.current.values())
@@ -498,11 +527,26 @@ export default function DayMatchesModal({
   useEffect(() => { setMatchMode((prev) => normalizeMode(participantCount, prev)) }, [participantCount])
   useEffect(() => { setEditMatchMode((prev) => normalizeMode(editParticipantCount, prev)) }, [editParticipantCount])
   useEffect(() => {
+    setBookingParticipantSelections((current) => Array.from({ length: participantCount }, (_, index) => current[index] ?? ''))
+  }, [participantCount])
+  useEffect(() => {
+    const teamCount = bookingLayout?.teams?.length || 0
+    setBookingSavedTeamSelections((current) => Array.from({ length: teamCount }, (_, index) => current[index] ?? ''))
+  }, [participantCount, matchMode])
+  useEffect(() => {
     if (!editingMatch) return
     const ids = getParticipantIdsFromMatch(editingMatch)
     setEditParticipantCount(ids.length || 2)
     setEditMatchMode(normalizeMode(ids.length || 2, editingMatch.mode || 'free_for_all'))
+    setEditParticipantSelections(ids.map((id) => String(id)))
   }, [editingMatch])
+  useEffect(() => {
+    setEditParticipantSelections((current) => Array.from({ length: editParticipantCount }, (_, index) => current[index] ?? ''))
+  }, [editParticipantCount])
+  useEffect(() => {
+    const teamCount = editLayout?.teams?.length || 0
+    setEditSavedTeamSelections((current) => Array.from({ length: teamCount }, (_, index) => current[index] ?? ''))
+  }, [editParticipantCount, editMatchMode])
   useEffect(() => {
     setEditingMatchId(null)
     resetEditSegmentForm()
@@ -603,6 +647,8 @@ export default function DayMatchesModal({
   const resetMatchForm = () => {
     setParticipantCount(2)
     setMatchMode('singles')
+    setBookingParticipantSelections(['', ''])
+    setBookingSavedTeamSelections([])
     setMatchFormKey((current) => current + 1)
   }
 
@@ -677,6 +723,10 @@ export default function DayMatchesModal({
     return uniqueIds(participantIds)
   }
 
+  const collectParticipantSelections = (selections, count) => uniqueIds(
+    Array.from({ length: count }, (_, index) => parseInt(selections[index], 10)).filter(Boolean)
+  )
+
   const collectTeamParticipants = (formData, layout) => {
     const participantIds = []
     layout.teams.forEach((team, teamIndex) => {
@@ -707,6 +757,80 @@ export default function DayMatchesModal({
     })
   }
 
+  const getAvailableWrestlersForSlot = (pool, selections, slotIndex) => {
+    const selectedElsewhere = new Set(
+      selections
+        .map((value, index) => (index === slotIndex ? null : parseInt(value, 10)))
+        .filter(Boolean)
+    )
+    return pool.filter((wrestler) => !selectedElsewhere.has(wrestler.id) || String(wrestler.id) === selections[slotIndex])
+  }
+
+  const updateBookingParticipantSlot = (slotIndex, value) => {
+    setBookingParticipantSelections((current) => {
+      const next = [...current]
+      next[slotIndex] = value
+      return next
+    })
+  }
+
+  const updateEditParticipantSlot = (slotIndex, value) => {
+    setEditParticipantSelections((current) => {
+      const next = [...current]
+      next[slotIndex] = value
+      return next
+    })
+  }
+
+  const applySavedTeamToBooking = (teamIndex, teamId) => {
+    setBookingSavedTeamSelections((current) => {
+      const next = [...current]
+      next[teamIndex] = teamId
+      return next
+    })
+
+    const eligibleTeams = getEligibleTeams(bookingLayout)
+    const selectedTeam = eligibleTeams.find((team) => String(team.id) === teamId)
+    if (!selectedTeam) return
+
+    let offset = 0
+    bookingLayout.teams.forEach((team, index) => {
+      if (index === teamIndex) return
+      offset += team.size
+    })
+    const start = bookingLayout.teams.slice(0, teamIndex).reduce((sum, team) => sum + team.size, 0)
+
+    setBookingParticipantSelections((current) => {
+      const next = [...current]
+      selectedTeam.memberIds.forEach((memberId, memberIndex) => {
+        next[start + memberIndex] = String(memberId)
+      })
+      return next
+    })
+  }
+
+  const applySavedTeamToEdit = (teamIndex, teamId) => {
+    setEditSavedTeamSelections((current) => {
+      const next = [...current]
+      next[teamIndex] = teamId
+      return next
+    })
+
+    const eligibleTeams = getEligibleTeams(editLayout)
+    const selectedTeam = eligibleTeams.find((team) => String(team.id) === teamId)
+    if (!selectedTeam) return
+
+    const start = editLayout.teams.slice(0, teamIndex).reduce((sum, team) => sum + team.size, 0)
+
+    setEditParticipantSelections((current) => {
+      const next = [...current]
+      selectedTeam.memberIds.forEach((memberId, memberIndex) => {
+        next[start + memberIndex] = String(memberId)
+      })
+      return next
+    })
+  }
+
   const handleUpdateSubmit = (e, match) => {
     e.preventDefault()
     const fd = new FormData(e.target)
@@ -715,10 +839,9 @@ export default function DayMatchesModal({
     const stipulation = fd.get('stipulation') || ''
     const mode = normalizeMode(editParticipantCount, fd.get('mode') || editMatchMode)
     const layout = getTeamLayout(editParticipantCount, mode)
-    applySelectedTeamsToForm(fd, layout)
     const participantIds = layout.isTeamBased
-      ? collectTeamParticipants(fd, layout)
-      : collectFlatParticipants(fd, editParticipantCount)
+      ? collectParticipantSelections(editParticipantSelections, editParticipantCount)
+      : collectParticipantSelections(editParticipantSelections, editParticipantCount)
     const submittedStory = fd.get('storyId') || ''
     const suggestedStories = getSuggestedStories(participantIds)
     const storyId = submittedStory === 'auto'
@@ -853,10 +976,9 @@ export default function DayMatchesModal({
     const stipulation = fd.get('stipulation') || ''
     const mode = normalizeMode(participantCount, fd.get('mode') || matchMode)
     const layout = getTeamLayout(participantCount, mode)
-    applySelectedTeamsToForm(fd, layout)
     const participantIds = layout.isTeamBased
-      ? collectTeamParticipants(fd, layout)
-      : collectFlatParticipants(fd, participantCount)
+      ? collectParticipantSelections(bookingParticipantSelections, participantCount)
+      : collectParticipantSelections(bookingParticipantSelections, participantCount)
     const submittedStory = fd.get('storyId') || ''
     const suggestedStories = getSuggestedStories(participantIds)
     const storyId = submittedStory === 'auto'
@@ -868,6 +990,8 @@ export default function DayMatchesModal({
 
   const bookingLayout = getTeamLayout(participantCount, matchMode)
   const bookingEligibleTeams = getEligibleTeams(bookingLayout)
+  const editLayout = getTeamLayout(editParticipantCount, editMatchMode)
+  const editEligibleTeams = getEligibleTeams(editLayout)
   const activeCategoryTypes = segCategory
     ? SEGMENT_CATEGORIES.find((c) => c.key === segCategory)?.types ?? []
     : []
@@ -1018,9 +1142,9 @@ export default function DayMatchesModal({
                 {!bookingLayout.isTeamBased && (
                   <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
                     {Array.from({ length: participantCount }).map((_, i) => (
-                      <select key={i} name={`participant_${i}`} defaultValue="" style={selectStyle}>
+                      <select key={i} name={`participant_${i}`} value={bookingParticipantSelections[i] ?? ''} onChange={(e) => updateBookingParticipantSlot(i, e.target.value)} style={selectStyle}>
                         <option value="">Participant {i + 1}</option>
-                        {bookingWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        {getAvailableWrestlersForSlot(bookingWrestlers, bookingParticipantSelections, i).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                       </select>
                     ))}
                   </div>
@@ -1033,7 +1157,7 @@ export default function DayMatchesModal({
                         {bookingEligibleTeams.length > 0 && (
                           <div style={{ marginBottom: 8 }}>
                             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                            <select name={`team${teamIndex}_saved`} defaultValue="" style={selectStyle}>
+                            <select name={`team${teamIndex}_saved`} value={bookingSavedTeamSelections[teamIndex] ?? ''} onChange={(e) => applySavedTeamToBooking(teamIndex, e.target.value)} style={selectStyle}>
                               <option value="">Manual selection</option>
                               {bookingEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
                             </select>
@@ -1042,9 +1166,15 @@ export default function DayMatchesModal({
                         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
                         <div style={{ display: 'grid', gap: 8 }}>
                           {Array.from({ length: team.size }).map((_, i) => (
-                            <select key={i} name={`team${teamIndex}_${i}`} defaultValue="" style={selectStyle}>
+                            <select
+                              key={i}
+                              name={`team${teamIndex}_${i}`}
+                              value={bookingParticipantSelections[bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0) + i] ?? ''}
+                              onChange={(e) => updateBookingParticipantSlot(bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0) + i, e.target.value)}
+                              style={selectStyle}
+                            >
                               <option value="">Select wrestler</option>
-                              {bookingWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                              {getAvailableWrestlersForSlot(bookingWrestlers, bookingParticipantSelections, bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0) + i).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </select>
                           ))}
                         </div>
@@ -1310,11 +1440,23 @@ export default function DayMatchesModal({
                                   </select>
                                 </div>
                               )}
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                              {participants.map((w) => (
-                                <button key={w.id} className={`winner-btn${m.winnerId === w.id ? ' selected' : ''}`} onClick={() => isCurrentDay && handleWinnerSelect(m.id, w.id)} disabled={!isCurrentDay}>{w.name}</button>
-                              ))}
-                            </div>
+                              {participants.length >= 10 ? (
+                                <select
+                                  value={m.winnerId ?? ''}
+                                  onChange={(e) => e.target.value && isCurrentDay && handleWinnerSelect(m.id, parseInt(e.target.value, 10))}
+                                  style={selectStyle}
+                                  disabled={!isCurrentDay}
+                                >
+                                  <option value="">Select winner</option>
+                                  {participants.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                </select>
+                              ) : (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                  {participants.map((w) => (
+                                    <button type="button" key={w.id} className={`winner-btn${m.winnerId === w.id ? ' selected' : ''}`} onClick={() => isCurrentDay && handleWinnerSelect(m.id, w.id)} disabled={!isCurrentDay}>{w.name}</button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                           {teams && (
@@ -1336,13 +1478,18 @@ export default function DayMatchesModal({
                               {teams.map((teamIds, teamIndex) => (
                                 <div key={`team-${teamIndex}`}>
                                   <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team {String.fromCharCode(65 + teamIndex)}</div>
-                                  <div className="item-participants">
+                                  <div
+                                    className="item-participants item-participants--team"
+                                    style={{ gridTemplateColumns: `repeat(${teamIds.length}, minmax(0, 1fr))` }}
+                                  >
                                     {teamIds.map((id) => {
                                       const w = getW(id); if (!w) return null
+                                      const teamWon = Boolean(m.winnerId && teamIds.includes(m.winnerId))
                                       return (
                                         <button 
+                                          type="button"
                                           key={id} 
-                                          className={`winner-button ${m.winnerId === id ? 'selected' : ''}`} 
+                                          className={`winner-button ${teamWon ? 'selected' : ''}`} 
                                           onClick={() => isCurrentDay && handleWinnerSelect(m.id, id)} 
                                           disabled={!isCurrentDay}
                                         >
@@ -1410,9 +1557,9 @@ export default function DayMatchesModal({
                           {!editLayout.isTeamBased && (
                             <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
                               {Array.from({ length: editParticipantCount }).map((_, index) => (
-                                <select key={index} name={`participant_${index}`} defaultValue={getParticipantIdsFromMatch(m)[index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
+                                <select key={index} name={`participant_${index}`} value={editParticipantSelections[index] ?? ''} onChange={(e) => updateEditParticipantSlot(index, e.target.value)} style={{ ...selectStyle, width: '100%' }}>
                                   <option value="">Participant {index + 1}</option>
-                                  {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                  {getAvailableWrestlersForSlot(editWrestlers, editParticipantSelections, index).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                                 </select>
                               ))}
                             </div>
@@ -1421,16 +1568,14 @@ export default function DayMatchesModal({
                           {editLayout.isTeamBased && (
                             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${editLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
                               {(() => {
-                                let participantOffset = 0
                                 return editLayout.teams.map((team, teamIndex) => {
-                                  const teamStart = participantOffset
-                                  participantOffset += team.size
+                                  const teamStart = editLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0)
                                   return (
                                     <div key={team.label}>
                                       {editEligibleTeams.length > 0 && (
                                         <div style={{ marginBottom: 8 }}>
                                           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                                          <select name={`team${teamIndex}_saved`} defaultValue="" style={{ ...selectStyle, width: '100%' }}>
+                                          <select name={`team${teamIndex}_saved`} value={editSavedTeamSelections[teamIndex] ?? ''} onChange={(e) => applySavedTeamToEdit(teamIndex, e.target.value)} style={{ ...selectStyle, width: '100%' }}>
                                             <option value="">Manual selection</option>
                                             {editEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
                                           </select>
@@ -1439,9 +1584,9 @@ export default function DayMatchesModal({
                                       <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
                                       <div style={{ display: 'grid', gap: 8 }}>
                                         {Array.from({ length: team.size }).map((_, index) => (
-                                          <select key={index} name={`team${teamIndex}_${index}`} defaultValue={getParticipantIdsFromMatch(m)[teamStart + index] ?? ''} style={{ ...selectStyle, width: '100%' }}>
+                                          <select key={index} name={`team${teamIndex}_${index}`} value={editParticipantSelections[teamStart + index] ?? ''} onChange={(e) => updateEditParticipantSlot(teamStart + index, e.target.value)} style={{ ...selectStyle, width: '100%' }}>
                                             <option value="">Select wrestler</option>
-                                            {editWrestlers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                            {getAvailableWrestlersForSlot(editWrestlers, editParticipantSelections, teamStart + index).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                                           </select>
                                         ))}
                                       </div>

@@ -356,6 +356,136 @@
   margin-bottom: 16px;
 }
 
+.story-form-main,
+.story-form-side {
+  min-width: 0;
+}
+
+.story-form-shell .form-group {
+  display: grid;
+  gap: 8px;
+}
+
+.story-form-shell .form-group label,
+.story-form-shell > form label,
+.story-form-card > label {
+  color: var(--text2);
+  font-size: 11px;
+  font-family: var(--font-compact);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.story-form-shell input,
+.story-form-shell select,
+.story-form-shell textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.story-form-shell textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.story-form-shell input:focus,
+.story-form-shell select:focus,
+.story-form-shell textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 90, 42, 0.12);
+}
+
+.story-form-shell select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text2) 50%),
+    linear-gradient(135deg, var(--text2) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.story-form-shell select option {
+  background: var(--bg3);
+  color: var(--text);
+}
+
+.story-form-shell .radio-group {
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+}
+
+.story-form-shell .radio-group label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text);
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.story-form-shell .radio-group label + label {
+  margin-top: 10px;
+}
+
+.story-form-shell .radio-group input[type='radio'],
+.story-form-shell .member-option input[type='checkbox'] {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin-top: 2px;
+  padding: 0;
+  accent-color: var(--primary);
+}
+
+.story-form-shell .member-selector {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: var(--radius);
+}
+
+.story-form-shell .member-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: 8px;
+}
+
+.story-form-shell .member-option:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.story-form-shell .member-option span:first-of-type {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.story-form-shell .member-option span:last-of-type {
+  color: var(--text3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
 @media (max-width: 960px) {
   .story-detail-shell,
   .story-form-shell {

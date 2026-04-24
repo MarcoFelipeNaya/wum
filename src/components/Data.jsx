@@ -85,6 +85,24 @@ export default function Data({
     }
   }
 
+  const handleLoadDemo = async () => {
+    const confirmed = confirm('Load demo universe? Current data will be replaced.')
+    if (!confirmed) return
+
+    try {
+      setIsLoadingDemo(true)
+      const response = await fetch('/demo-universe.json', { cache: 'no-store' })
+      if (!response.ok) throw new Error('Could not load demo universe')
+      const text = await response.text()
+      await importData(text)
+      showToast('Demo universe loaded')
+    } catch (error) {
+      showToast('Demo load failed')
+    } finally {
+      setIsLoadingDemo(false)
+    }
+  }
+
   return (
     <div className="data-page">
       <div className="page-header">
@@ -148,8 +166,8 @@ export default function Data({
               <FiGlobe style={{ fontSize: 24, color: 'var(--gold)' }} />
               <div className="data-action-title">Demo Universe</div>
               <div className="data-action-copy">Inject a curated fiction universe to explore Heat features instantly.</div>
-              <button className="btn btn-secondary" onClick={() => { if(confirm('Load demo? Current data will be replaced.')) showToast('Demo load initiated'); }}>
-                Load Sample
+              <button className="btn btn-secondary" onClick={handleLoadDemo} disabled={isLoadingDemo}>
+                {isLoadingDemo ? 'Loading Demo...' : 'Load Sample'}
               </button>
             </div>
           </div>
