@@ -1,8 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal.jsx'
+import { InspectorSummary, MatchEditor, SegmentEditor } from './booking/InspectorEditors.jsx'
+import { MatchShowCardItem, SegmentShowCardItem } from './booking/ShowCardItems.jsx'
+import ProducerRail from './booking/ProducerRail.jsx'
 import { DAY_NAMES, MONTHS } from '../utils/dates.js'
 import { 
-  FiStar, 
   FiCheckCircle, 
   FiZap, 
   FiAward, 
@@ -13,11 +15,6 @@ import {
   FiShield, 
   FiActivity, 
   FiCopy, 
-  FiTrash2, 
-  FiPlus, 
-  FiChevronUp, 
-  FiChevronDown, 
-  FiInfo,
   FiLayers
 } from 'react-icons/fi'
 import './DayMatchesModal.css'
@@ -229,75 +226,6 @@ function getDayCardItemKey(item) {
     : `segment:${item.segmentId ?? `${item.storyId}:${item.segmentIndex}`}`
 }
 
-function MatchRatingInput({ rating, disabled, onChange }) {
-  return (
-    <div className="item-rating-row">
-      <div className="star-rating">
-        {Array.from({ length: 5 }).map((_, index) => {
-          const starIndex = index + 1
-          const isActive = (rating || 0) >= starIndex
-          const isHalf = (rating || 0) >= starIndex - 0.5 && (rating || 0) < starIndex
-          
-          return (
-            <div key={starIndex} style={{ position: 'relative', width: 24, height: 24 }}>
-              <FiStar
-                className="star-icon"
-                style={{
-                  color: 'var(--text3)',
-                  opacity: 0.25,
-                  position: 'absolute',
-                  inset: 0,
-                }}
-              />
-              {(isActive || isHalf) && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: isActive ? '100%' : '50%',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <FiStar
-                    className="star-icon active"
-                    style={{
-                      color: 'var(--gold)',
-                      position: 'absolute',
-                      inset: 0,
-                    }}
-                  />
-                </div>
-              )}
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onChange(starIndex - 0.5)}
-                style={{ position: 'absolute', inset: '0 50% 0 0', border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer', zIndex: 2 }}
-              />
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onChange(starIndex)}
-                style={{ position: 'absolute', inset: '0 0 0 50%', border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer', zIndex: 2 }}
-              />
-            </div>
-          )
-        })}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 900, color: rating ? 'var(--gold)' : 'var(--text3)', letterSpacing: '0.5px' }}>
-          {rating ? `${rating.toFixed(1)} STARS` : 'UNRATED'}
-        </span>
-        {!disabled && rating != null && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(null)}>
-            Clear
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function getChampIds(title) {
   if (Array.isArray(title?.champIds) && title.champIds.length > 0) return title.champIds
   return title?.champId ? [title.champId] : []
@@ -450,6 +378,10 @@ export default function DayMatchesModal({
   }, [])
 
   const editingMatch = useMemo(() => dayMatches.find((m) => m.id === editingMatchId) || null, [dayMatches, editingMatchId])
+  const editingSegment = useMemo(
+    () => daySegments.find((segment) => segment.id === editingSegmentId) || null,
+    [daySegments, editingSegmentId]
+  )
   const orderedMatches = useMemo(() => [...dayMatches].reverse(), [dayMatches])
   const tagTeams = useMemo(() => teams.filter((team) => team.type === 'tag'), [teams])
   const triosTeams = useMemo(() => teams.filter((team) => team.type === 'trio'), [teams])
@@ -681,6 +613,7 @@ export default function DayMatchesModal({
   const startEditingSegment = (segment) => {
     setComposerMode('segment')
     setSelectedBoardItemKey(`segment:${segment.id}`)
+    setEditingMatchId(null)
     setEditingSegmentId(segment.id)
     setEditSegTitle(segment.title || '')
     setEditSegDescription(segment.description || '')
@@ -739,6 +672,7 @@ export default function DayMatchesModal({
     const ids = getParticipantIdsFromMatch(match)
     setComposerMode('match')
     setSelectedBoardItemKey(`match:${match.id}`)
+    resetEditSegmentForm()
     setEditingMatchId(match.id)
     setEditParticipantCount(ids.length || 2)
     setEditMatchMode(normalizeMode(ids.length || 2, match.mode || 'free_for_all'))
@@ -1184,98 +1118,19 @@ export default function DayMatchesModal({
         {isCurrentDay && (
           <div className="booking-modal-column booking-modal-column--left">
             <SectionCard title="Producer Rail" icon={FiLayers}>
-              <div className="producer-rail-group">
-                <div className="producer-rail-label">Composer</div>
-                <div className="producer-mode-toggle">
-                  <button type="button" className={`producer-mode-btn${composerMode === 'match' ? ' active' : ''}`} onClick={() => setComposerMode('match')}>
-                    <FiAward /> Match
-                  </button>
-                  <button type="button" className={`producer-mode-btn${composerMode === 'segment' ? ' active' : ''}`} onClick={() => setComposerMode('segment')}>
-                    <FiMic /> Segment
-                  </button>
-                </div>
-              </div>
-
-              {!editingMatchId && !editingSegmentId && composerMode === 'match' && (
-                <div className="producer-rail-group">
-                  <div className="producer-rail-label">Quick Match Templates</div>
-                  <div className="producer-chip-grid">
-                    {quickMatchTemplates.map((template) => (
-                      <button
-                        key={`${template.count}-${template.mode}`}
-                        type="button"
-                        className="producer-chip"
-                        onClick={() => applyMatchTemplate(template.count, template.mode)}
-                      >
-                        {template.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!editingMatchId && !editingSegmentId && composerMode === 'segment' && (
-                <div className="producer-rail-group">
-                  <div className="producer-rail-label">Quick Segment Templates</div>
-                  <div className="producer-chip-grid">
-                    {quickSegmentTemplates.map((template) => (
-                      <button
-                        key={`${template.category}-${template.type}`}
-                        type="button"
-                        className="producer-chip"
-                        onClick={() => applySegmentTemplate(template.category, template.type)}
-                      >
-                        {template.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="producer-rail-group">
-                <div className="producer-rail-label">Available Talent</div>
-                <div className="producer-mini-list">
-                  {producerTalent.map((wrestler) => (
-                    <div key={wrestler.id} className="producer-mini-row">
-                      <div>
-                        <div className="producer-mini-title">{wrestler.name}</div>
-                        <div className="producer-mini-meta">{wrestler.show || 'Universe'}</div>
-                      </div>
-                    </div>
-                  ))}
-                  {producerTalent.length === 0 && <div className="producer-empty-copy">No talent in current filter.</div>}
-                </div>
-              </div>
-
-              <div className="producer-rail-group">
-                <div className="producer-rail-label">Story Hooks</div>
-                <div className="producer-mini-list">
-                  {producerStories.map((story) => (
-                    <div key={story.id} className="producer-mini-row">
-                      <div>
-                        <div className="producer-mini-title">{story.name}</div>
-                        <div className="producer-mini-meta">{story.type} • {story.status}</div>
-                      </div>
-                    </div>
-                  ))}
-                  {producerStories.length === 0 && <div className="producer-empty-copy">No active stories available.</div>}
-                </div>
-              </div>
-
-              <div className="producer-rail-group">
-                <div className="producer-rail-label">Belts In Orbit</div>
-                <div className="producer-mini-list">
-                  {producerTitles.map((title) => (
-                    <div key={title.id} className="producer-mini-row">
-                      <div>
-                        <div className="producer-mini-title">{title.name}</div>
-                        <div className="producer-mini-meta">{getTitleType(title)}</div>
-                      </div>
-                    </div>
-                  ))}
-                  {producerTitles.length === 0 && <div className="producer-empty-copy">No compatible titles in this filter.</div>}
-                </div>
-              </div>
+              <ProducerRail
+                composerMode={composerMode}
+                onComposerModeChange={setComposerMode}
+                canUseTemplates={!editingMatchId && !editingSegmentId}
+                quickMatchTemplates={quickMatchTemplates}
+                quickSegmentTemplates={quickSegmentTemplates}
+                onApplyMatchTemplate={applyMatchTemplate}
+                onApplySegmentTemplate={applySegmentTemplate}
+                producerTalent={producerTalent}
+                producerStories={producerStories}
+                producerTitles={producerTitles}
+                getTitleType={getTitleType}
+              />
             </SectionCard>
           </div>
         )}
@@ -1295,232 +1150,76 @@ export default function DayMatchesModal({
             {dayCardItems.length > 0 && (
               <div style={{ display: 'grid', gap: 12 }}>
                 {dayCardItems.map((item, i) => {
+                  const itemKey = getDayCardItemKey(item)
+                  const isDragOver = dragOverKey === `${item.kind}:${item.id ?? item.segmentId}`
+                  const setCardRef = (node) => {
+                    if (node) dayCardRefs.current.set(itemKey, node)
+                    else dayCardRefs.current.delete(itemKey)
+                  }
+
                   if (item.kind === 'segment') {
-                    const seg = item.segment
-                    const taggedWrestlers = (seg.wrestlerIds || []).map((id) => getW(id)).filter(Boolean)
-                    const typeColor = segmentTypeBadgeColor(seg.segmentType)
                     return (
-                      <div key={`segment-${seg.storyId}-${seg.segmentIndex}`}
-                        ref={(node) => {
-                          const key = getDayCardItemKey(item)
-                          if (node) dayCardRefs.current.set(key, node)
-                          else dayCardRefs.current.delete(key)
-                        }}
-                        onClick={() => focusBoardItem(item)}
-                        draggable={isCurrentDay}
-                        onDragStart={() => handleDragStart(item)}
+                      <SegmentShowCardItem
+                        key={itemKey}
+                        item={item}
+                        index={i}
+                        isCurrentDay={isCurrentDay}
+                        isFirst={i === 0}
+                        isLast={i === dayCardItems.length - 1}
+                        selected={selectedBoardItemKey === itemKey}
+                        dragged={Boolean(draggedItem && isDragOver)}
+                        dragOver={isDragOver}
+                        setCardRef={setCardRef}
+                        onFocus={focusBoardItem}
+                        onDragStart={handleDragStart}
                         onDragEnd={clearDragState}
-                        onDragOver={(e) => handleDragOver(e, item)}
-                        onDrop={() => handleDrop(item)}
-                        className="show-card-item segment"
-                        style={{
-                          cursor: 'pointer',
-                          opacity: draggedItem && dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 0.92 : 1,
-                          boxShadow:
-                            dragOverKey === `${item.kind}:${item.id ?? item.segmentId}`
-                              ? 'var(--glow-heat)'
-                              : selectedBoardItemKey === getDayCardItemKey(item)
-                              ? '0 0 0 1px rgba(255, 90, 42, 0.22), 0 14px 30px rgba(0, 0, 0, 0.26)'
-                              : 'none',
-                        }}
-                      >
-                        <div className="item-badge-row">
-                          <div className="item-badges">
-                            <span className="badge badge-purple">SEGMENT {i + 1}</span>
-                            {seg.segmentType && (
-                              <span className="badge badge-dim">
-                                {seg.segmentType}
-                              </span>
-                            )}
-                            {seg.storyName && <span className="badge badge-dim">{seg.storyName}</span>}
-                          </div>
-                            <div className="item-actions">
-                              {isCurrentDay && <FiActivity style={{ fontSize: 14, color: 'var(--text3)', marginRight: 4 }} title="Drag to reorder" />}
-                              <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}><FiChevronUp /></button>
-                              <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
-                              {isCurrentDay && onDeleteSegment && (
-                                <button type="button" className="btn btn-icon btn-danger btn-sm" onClick={() => onDeleteSegment(seg.storyId, seg.segmentIndex, seg.id)}><FiTrash2 /></button>
-                              )}
-                            </div>
-                          </div>
-                        {seg.title && <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 2 }}>{seg.title}</div>}
-                        {seg.description && <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{seg.description}</div>}
-                        {taggedWrestlers.length > 0 && (
-                          <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {taggedWrestlers.map((w) => (
-                              <span key={w.id} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 'var(--radius)', background: 'var(--bg2)', color: 'var(--text2)', border: '1px solid var(--border2)' }}>
-                                {w.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {isCurrentDay && onUpdateSegment && (
-                          <div className="board-card-hint">
-                            {selectedBoardItemKey === getDayCardItemKey(item) ? 'Editing in inspector' : 'Click card to edit in inspector'}
-                          </div>
-                        )}
-                      </div>
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onMove={handleMoveItem}
+                        onDeleteSegment={onDeleteSegment}
+                        onUpdateSegment={onUpdateSegment}
+                        getW={getW}
+                      />
                     )
                   }
 
-                  const m = item.match
-                  const participantIds = getParticipantIdsFromMatch(m)
-                  const participants = participantIds.map((id) => getW(id)).filter(Boolean)
-                  const teams = getTeamsFromMatch(m)
-                  const titleMatch = titles.find((t) => t.id === m.titleId)
                   return (
-                    <div key={m.id}
-                      ref={(node) => {
-                        const key = getDayCardItemKey(item)
-                        if (node) dayCardRefs.current.set(key, node)
-                        else dayCardRefs.current.delete(key)
-                      }}
-                      onClick={() => focusBoardItem(item)}
-                      draggable={isCurrentDay}
-                      onDragStart={() => handleDragStart(item)}
+                    <MatchShowCardItem
+                      key={itemKey}
+                      item={item}
+                      index={i}
+                      isCurrentDay={isCurrentDay}
+                      isFirst={i === 0}
+                      isLast={i === dayCardItems.length - 1}
+                      selected={selectedBoardItemKey === itemKey}
+                      dragged={Boolean(draggedItem && isDragOver)}
+                      dragOver={isDragOver}
+                      accentColor={accentColor}
+                      isPhoneLayout={isPhoneLayout}
+                      setCardRef={setCardRef}
+                      onFocus={focusBoardItem}
+                      onDragStart={handleDragStart}
                       onDragEnd={clearDragState}
-                      onDragOver={(e) => handleDragOver(e, item)}
-                      onDrop={() => handleDrop(item)}
-                        className="show-card-item match"
-                        style={{
-                          '--event-accent': accentColor,
-                          cursor: 'pointer',
-                          opacity: draggedItem && dragOverKey === `${item.kind}:${item.id}` ? 0.92 : 1,
-                          boxShadow:
-                            dragOverKey === `${item.kind}:${item.id}`
-                              ? `0 0 0 1px ${accentColor}55, 0 14px 30px rgba(0, 0, 0, 0.26)`
-                              : selectedBoardItemKey === getDayCardItemKey(item)
-                              ? `0 0 0 1px ${accentColor}55, 0 14px 30px rgba(0, 0, 0, 0.26)`
-                              : 'none',
-                        }}
-                      >
-                      <div className="item-badge-row">
-                        <div className="item-badges">
-                          <span className="badge badge-primary">MATCH {i + 1}</span>
-                          <span className="badge badge-dim">{m.matchType || getMatchTypeLabel(participantIds.length, m.mode)}</span>
-                          {i === 0 && <span className="badge badge-gold"><FiAward style={{ marginRight: 4 }} /> Main Event</span>}
-                          {m.stipulation && <span className="badge badge-red">{m.stipulation}</span>}
-                          {titleMatch && <span className="badge badge-gold"><FiAward style={{ marginRight: 4 }} /> {titleMatch.name}</span>}
-                        </div>
-                        <div className="item-actions">
-                          {isCurrentDay && <FiActivity style={{ fontSize: 14, color: 'var(--text3)', marginRight: 4 }} title="Drag to reorder" />}
-                          <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}><FiChevronUp /></button>
-                          <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
-                        </div>
-                      </div>
-                      <>
-                          {!teams && (
-                            <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
-                              {!m.winnerId && (
-                                <div style={{ display: 'grid', gap: 6 }}>
-                                    <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
-                                    <select
-                                      value={winnerFinishTypes[m.id] || FINISH_TYPES[0]}
-                                      onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
-                                      style={selectStyle}
-                                    >
-                                      {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
-                                    </select>
-                                  </div>
-                              )}
-                              {participants.length >= 10 ? (
-                                <select
-                                  value={m.winnerId ?? ''}
-                                  onChange={(e) => e.target.value && isCurrentDay && handleWinnerSelect(m.id, parseInt(e.target.value, 10))}
-                                  style={selectStyle}
-                                  disabled={!isCurrentDay}
-                                >
-                                  <option value="">Select winner</option>
-                                  {participants.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                </select>
-                              ) : (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                  {participants.map((w) => (
-                                    <button type="button" key={w.id} className={`winner-btn${m.winnerId === w.id ? ' selected' : ''}`} onClick={() => isCurrentDay && handleWinnerSelect(m.id, w.id)} disabled={!isCurrentDay}>{w.name}</button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {teams && (
-                            <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-                              {!m.winnerId && (
-                                <div style={{ display: 'grid', gap: 6 }}>
-                                    <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
-                                    <select
-                                      value={winnerFinishTypes[m.id] || FINISH_TYPES[0]}
-                                      onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
-                                      style={selectStyle}
-                                    >
-                                      {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
-                                    </select>
-                                  </div>
-                              )}
-                            <div style={{ display: 'grid', gridTemplateColumns: isPhoneLayout ? '1fr' : `repeat(${teams.length}, minmax(0, 1fr))`, gap: 12, alignItems: 'start' }}>
-                              {teams.map((teamIds, teamIndex) => (
-                                <div key={`team-${teamIndex}`}>
-                                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Team {String.fromCharCode(65 + teamIndex)}</div>
-                                  <div
-                                    className="item-participants item-participants--team"
-                                    style={{ gridTemplateColumns: `repeat(${teamIds.length}, minmax(0, 1fr))` }}
-                                  >
-                                    {teamIds.map((id) => {
-                                      const w = getW(id); if (!w) return null
-                                      const teamWon = Boolean(m.winnerId && teamIds.includes(m.winnerId))
-                                      return (
-                                        <button 
-                                          type="button"
-                                          key={id} 
-                                          className={`winner-button ${teamWon ? 'selected' : ''}`} 
-                                          onClick={() => isCurrentDay && handleWinnerSelect(m.id, id)} 
-                                          disabled={!isCurrentDay}
-                                        >
-                                          {w.name}
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            </div>
-                          )}
-                          {m.winnerId && <div className="match-winner-label">Winner: {getWinnerNamesFromMatch(m, getW).join(' / ')}{m.finishType ? ` • ${m.finishType}` : ''}</div>}
-
-                          <div className="item-rating-row">
-                            <MatchRatingInput
-                              rating={m.rating ?? null}
-                              disabled={!isCurrentDay}
-                              onChange={(value) => onSetMatchRating?.(m.id, value)}
-                            />
-                          </div>
-
-                      {m.notes && (
-                        <div className="item-notes" style={{ marginTop: 14 }}>
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExpandedNotesId(expandedNotesId === m.id ? null : m.id)}>
-                            {expandedNotesId === m.id ? 'Hide Notes' : 'Show Notes'}
-                              </button>
-                              {expandedNotesId === m.id && <p style={{ marginTop: 10, color: 'var(--text2)', lineHeight: 1.6 }}>{m.notes}</p>}
-                            </div>
-                      )}
-
-                      {isCurrentDay && (
-                        <div className="board-card-hint">
-                          {canEditMatch(m)
-                            ? selectedBoardItemKey === getDayCardItemKey(item)
-                              ? 'Editing in inspector'
-                              : 'Click card to edit in inspector'
-                            : 'Result locked after winner is set'}
-                        </div>
-                      )}
-
-                      {canEditMatch(m) && (
-                        <div className="form-actions" style={{ marginTop: 10 }}>
-                          <button type="button" className="btn btn-danger" onClick={() => onDeleteMatch(m.id)}>Delete Match</button>
-                        </div>
-                      )}
-                      </>
-                    </div>
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onMove={handleMoveItem}
+                      onDeleteMatch={onDeleteMatch}
+                      onSetMatchRating={onSetMatchRating}
+                      canEditMatch={canEditMatch}
+                      getParticipantIdsFromMatch={getParticipantIdsFromMatch}
+                      getTeamsFromMatch={getTeamsFromMatch}
+                      getWinnerNamesFromMatch={getWinnerNamesFromMatch}
+                      getMatchTypeLabel={getMatchTypeLabel}
+                      getW={getW}
+                      titles={titles}
+                      selectStyle={selectStyle}
+                      finishTypes={FINISH_TYPES}
+                      winnerFinishTypes={winnerFinishTypes}
+                      setWinnerFinishTypes={setWinnerFinishTypes}
+                      onWinnerSelect={handleWinnerSelect}
+                      expandedNotesId={expandedNotesId}
+                      setExpandedNotesId={setExpandedNotesId}
+                    />
                   )
                 })}
               </div>
@@ -1586,51 +1285,71 @@ export default function DayMatchesModal({
         {isCurrentDay && (
           <div className="booking-modal-column booking-modal-column--right">
             <SectionCard title={editingMatchId ? 'Inspector • Editing Match' : editingSegmentId ? 'Inspector • Editing Segment' : composerMode === 'match' ? 'Inspector • Match Composer' : 'Inspector • Segment Composer'} icon={composerMode === 'match' ? FiAward : FiMic}>
-              {selectedBoardItem && (
-                <div className="inspector-summary">
-                  <div className="inspector-summary-label">
-                    {selectedBoardItem.kind === 'match' ? 'Selected Match' : 'Selected Segment'}
-                  </div>
-                  {selectedBoardItem.kind === 'match' ? (
-                    (() => {
-                      const match = selectedBoardItem.match
-                      const participantIds = getParticipantIdsFromMatch(match)
-                      const participantNames = participantIds.map((id) => getW(id)?.name).filter(Boolean)
-                      const linkedTitle = titles.find((title) => title.id === match.titleId)
-                      return (
-                        <>
-                          <div className="inspector-summary-title">
-                            {participantNames.join(' vs ') || 'Match slot'}
-                          </div>
-                          <div className="inspector-summary-meta">
-                            <span>{match.matchType || getMatchTypeLabel(participantIds.length, match.mode)}</span>
-                            {linkedTitle && <span>{linkedTitle.name}</span>}
-                            {match.stipulation && <span>{match.stipulation}</span>}
-                            {match.winnerId && <span>Winner: {getWinnerNamesFromMatch(match, getW).join(' / ')}</span>}
-                          </div>
-                        </>
-                      )
-                    })()
-                  ) : (
-                    (() => {
-                      const segment = selectedBoardItem.segment
-                      return (
-                        <>
-                          <div className="inspector-summary-title">
-                            {segment.title || segment.segmentType || 'Segment slot'}
-                          </div>
-                          <div className="inspector-summary-meta">
-                            {segment.segmentType && <span>{segment.segmentType}</span>}
-                            {segment.storyName && <span>{segment.storyName}</span>}
-                            {segment.wrestlerIds?.length > 0 && <span>{segment.wrestlerIds.length} tagged</span>}
-                          </div>
-                        </>
-                      )
-                    })()
-                  )}
-                </div>
+              <InspectorSummary
+                selectedBoardItem={selectedBoardItem}
+                getParticipantIdsFromMatch={getParticipantIdsFromMatch}
+                getW={getW}
+                titles={titles}
+                getMatchTypeLabel={getMatchTypeLabel}
+                getWinnerNamesFromMatch={getWinnerNamesFromMatch}
+              />
+              {editingMatchId && editingMatch && (
+                <MatchEditor
+                  editingMatch={editingMatch}
+                  editParticipantCount={editParticipantCount}
+                  setEditParticipantCount={setEditParticipantCount}
+                  editMatchMode={editMatchMode}
+                  setEditMatchMode={setEditMatchMode}
+                  editLayout={editLayout}
+                  editParticipantSelections={editParticipantSelections}
+                  updateEditParticipantSlot={updateEditParticipantSlot}
+                  editWrestlers={editWrestlers}
+                  getAvailableWrestlersForSlot={getAvailableWrestlersForSlot}
+                  editEligibleTeams={editEligibleTeams}
+                  editSavedTeamSelections={editSavedTeamSelections}
+                  applySavedTeamToEdit={applySavedTeamToEdit}
+                  editTitles={editTitles}
+                  getChampIds={getChampIds}
+                  getW={getW}
+                  getTitleType={getTitleType}
+                  getAllowedModes={getAllowedModes}
+                  getMatchTypeLabel={getMatchTypeLabel}
+                  selectStyle={selectStyle}
+                  smallSelectStyle={smallSelectStyle}
+                  onSubmit={handleUpdateSubmit}
+                  onCancel={() => setEditingMatchId(null)}
+                  allowedParticipantCounts={ALLOWED_PARTICIPANT_COUNTS}
+                />
               )}
-              {composerMode === 'match' && (
+
+              {editingSegmentId && editingSegment && (
+                <SegmentEditor
+                  editSegTitle={editSegTitle}
+                  setEditSegTitle={setEditSegTitle}
+                  editSegDescription={editSegDescription}
+                  setEditSegDescription={setEditSegDescription}
+                  editSegCategory={editSegCategory}
+                  setEditSegCategory={setEditSegCategory}
+                  editSegType={editSegType}
+                  setEditSegType={setEditSegType}
+                  editActiveCategoryTypes={editActiveCategoryTypes}
+                  segmentCategories={SEGMENT_CATEGORIES}
+                  twoColumnOptionGrid={twoColumnOptionGrid}
+                  editSegWrestlerSearch={editSegWrestlerSearch}
+                  setEditSegWrestlerSearch={setEditSegWrestlerSearch}
+                  editSegWrestlerBrand={editSegWrestlerBrand}
+                  setEditSegWrestlerBrand={setEditSegWrestlerBrand}
+                  availableShowOptions={availableShowOptions}
+                  smallSelectStyle={smallSelectStyle}
+                  editSegmentWrestlers={editSegmentWrestlers}
+                  editSegSelectedWrestlers={editSegSelectedWrestlers}
+                  toggleEditSegWrestler={toggleEditSegWrestler}
+                  onCancel={resetEditSegmentForm}
+                  onSave={() => handleSaveSegmentEdit(editingSegment)}
+                />
+              )}
+
+              {!editingMatchId && !editingSegmentId && composerMode === 'match' && (
                 <>
                   <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 0, marginBottom: 14 }}>
                     Build the next match directly from the board. Use the rail for templates and quick roster context.
@@ -1762,7 +1481,7 @@ export default function DayMatchesModal({
                 </>
               )}
 
-              {composerMode === 'segment' && (
+              {!editingMatchId && !editingSegmentId && composerMode === 'segment' && (
                 <>
                   <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 0, marginBottom: 14 }}>
                     Book a promo, interview, or other non-match segment.

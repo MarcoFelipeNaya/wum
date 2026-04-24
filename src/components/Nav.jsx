@@ -1,18 +1,17 @@
 import React from 'react'
-import { 
-  FiLayout, 
-  FiUsers, 
-  FiShield, 
-  FiTv, 
-  FiBarChart2, 
-  FiActivity, 
-  FiCalendar, 
-  FiAward, 
-  FiBookOpen, 
-  FiDatabase 
+import {
+  FiActivity,
+  FiAward,
+  FiBarChart2,
+  FiBookOpen,
+  FiCalendar,
+  FiDatabase,
+  FiLayout,
+  FiTv,
+  FiUsers,
 } from 'react-icons/fi'
-import { HiOutlineUserGroup } from "react-icons/hi";
-import { TbTournament } from "react-icons/tb";
+import { HiOutlineUserGroup } from 'react-icons/hi'
+import { TbTournament } from 'react-icons/tb'
 import './Nav.css'
 
 const PAGES = [
@@ -44,6 +43,7 @@ export default function Nav({ current, onNavigate }) {
           const Icon = p.icon
           return (
             <button
+              type="button"
               key={p.id}
               className={`nav-sidebar-btn${current === p.id ? ' active' : ''}`}
               onClick={() => onNavigate(p.id)}
@@ -59,7 +59,7 @@ export default function Nav({ current, onNavigate }) {
       </div>
 
       <div className="nav-sidebar-footer">
-        <div className="nav-sidebar-version">v1.1.0 Opening Bell</div>
+        <div className="nav-sidebar-version">v1.1.2 Opening Bell</div>
       </div>
     </nav>
   )

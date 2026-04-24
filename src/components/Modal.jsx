@@ -1,16 +1,23 @@
-import React, { useEffect } from 'react'
+import React, { useCallback, useEffect } from 'react'
 
 export default function Modal({ title, onClose, children, style }) {
+  const handleOverlayClick = useCallback((event) => {
+    if (event.target === event.currentTarget) onClose()
+  }, [onClose])
+
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
   return (
     <div
       className="modal-overlay"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={handleOverlayClick}
     >
       <div className="modal" style={style}>
         {title && <h2>{title}</h2>}

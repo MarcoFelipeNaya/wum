@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export function useToast() {
   const [toast, setToast] = useState({ msg: '', show: false })
@@ -7,7 +7,11 @@ export function useToast() {
   const showToast = useCallback((msg) => {
     if (timer.current) clearTimeout(timer.current)
     setToast({ msg, show: true })
-    timer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 2500)
+    timer.current = setTimeout(() => setToast((currentToast) => ({ ...currentToast, show: false })), 2500)
+  }, [])
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
   }, [])
 
   return { toast, showToast }

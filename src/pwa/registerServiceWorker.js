@@ -1,13 +1,28 @@
 export function registerHeatPWA() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return
   if (!('serviceWorker' in navigator)) return
   if (!import.meta.env.PROD) return
 
   let deferredInstallPrompt = null
+  let refreshing = false
 
   const dispatchInstallState = () => {
     window.dispatchEvent(new CustomEvent('heat-pwa-install-available', {
       detail: { available: Boolean(deferredInstallPrompt) },
     }))
+  }
+
+  const dispatchUpdateReady = () => {
+    window.dispatchEvent(new CustomEvent('heat-pwa-update-ready'))
+  }
+
+  const notifyUpdate = (worker) => {
+    if (!worker) return
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        dispatchUpdateReady()
+      }
+    })
   }
 
   window.addEventListener('beforeinstallprompt', (event) => {
@@ -32,16 +47,7 @@ export function registerHeatPWA() {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
       if (registration.waiting) {
-        window.dispatchEvent(new CustomEvent('heat-pwa-update-ready'))
-      }
-
-      const notifyUpdate = (worker) => {
-        if (!worker) return
-        worker.addEventListener('statechange', () => {
-          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-            window.dispatchEvent(new CustomEvent('heat-pwa-update-ready'))
-          }
-        })
+        dispatchUpdateReady()
       }
 
       notifyUpdate(registration.installing)
@@ -52,7 +58,6 @@ export function registerHeatPWA() {
 
       registration.update().catch(() => {})
 
-      let refreshing = false
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (refreshing) return
         refreshing = true

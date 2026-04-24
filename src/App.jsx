@@ -15,6 +15,20 @@ import { useStore } from './store.js'
 import { useToast } from './hooks/useToast.js'
 import './App.css'
 
+const PAGE_COMPONENTS = {
+  dashboard: Dashboard,
+  roster: Roster,
+  factions: Factions,
+  shows: Shows,
+  rankings: Rankings,
+  records: Records,
+  calendar: Calendar,
+  tournaments: Tournaments,
+  titles: Titles,
+  stories: Stories,
+  data: Data,
+}
+
 export default function App() {
   const [page, setPage] = useState('dashboard')
   const [pwaInstallAvailable, setPwaInstallAvailable] = useState(false)
@@ -22,6 +36,7 @@ export default function App() {
   const { toast, showToast } = useToast()
   const store = useStore()
   const { state } = store
+  const PageComponent = PAGE_COMPONENTS[page] || Dashboard
 
   const pageProps = { state, showToast, ...store }
 
@@ -123,17 +138,7 @@ export default function App() {
         )}
 
         <main className="app-main-view">
-          {page === 'dashboard' && <Dashboard {...pageProps} />}
-          {page === 'roster'    && <Roster    {...pageProps} />}
-          {page === 'factions'  && <Factions  {...pageProps} />}
-          {page === 'shows'     && <Shows     {...pageProps} />}
-          {page === 'rankings'  && <Rankings  {...pageProps} />}
-          {page === 'records'   && <Records   {...pageProps} />}
-          {page === 'calendar'  && <Calendar  {...pageProps} advanceDay={store.advanceDay} />}
-          {page === 'tournaments' && <Tournaments {...pageProps} />}
-          {page === 'titles'    && <Titles    {...pageProps} />}
-          {page === 'stories'   && <Stories   {...pageProps} />}
-          {page === 'data'      && <Data      {...pageProps} />}
+          <PageComponent {...pageProps} />
         </main>
       </div>
 
