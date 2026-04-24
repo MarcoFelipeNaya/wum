@@ -14,11 +14,11 @@ import {
   FiActivity, 
   FiCopy, 
   FiTrash2, 
-  FiEdit3, 
   FiPlus, 
   FiChevronUp, 
   FiChevronDown, 
-  FiInfo
+  FiInfo,
+  FiLayers
 } from 'react-icons/fi'
 import './DayMatchesModal.css'
 
@@ -411,6 +411,8 @@ export default function DayMatchesModal({
   const [matchMode, setMatchMode] = useState('singles')
   const [editParticipantCount, setEditParticipantCount] = useState(2)
   const [editMatchMode, setEditMatchMode] = useState('singles')
+  const [composerMode, setComposerMode] = useState('match')
+  const [selectedBoardItemKey, setSelectedBoardItemKey] = useState(null)
   const [bookingParticipantSelections, setBookingParticipantSelections] = useState(['', ''])
   const [bookingSavedTeamSelections, setBookingSavedTeamSelections] = useState([])
   const [editParticipantSelections, setEditParticipantSelections] = useState([])
@@ -472,6 +474,10 @@ export default function DayMatchesModal({
     () => dayCardItems.map((item) => `${getDayCardItemKey(item)}:${item.cardOrder}`).join('|'),
     [dayCardItems]
   )
+  const selectedBoardItem = useMemo(
+    () => dayCardItems.find((item) => getDayCardItemKey(item) === selectedBoardItemKey) || null,
+    [dayCardItems, selectedBoardItemKey]
+  )
 
   useLayoutEffect(() => {
     const nextPositions = new Map()
@@ -530,7 +536,7 @@ export default function DayMatchesModal({
     setBookingParticipantSelections((current) => Array.from({ length: participantCount }, (_, index) => current[index] ?? ''))
   }, [participantCount])
   useEffect(() => {
-    const teamCount = bookingLayout?.teams?.length || 0
+    const teamCount = getTeamLayout(participantCount, matchMode)?.teams?.length || 0
     setBookingSavedTeamSelections((current) => Array.from({ length: teamCount }, (_, index) => current[index] ?? ''))
   }, [participantCount, matchMode])
   useEffect(() => {
@@ -544,12 +550,14 @@ export default function DayMatchesModal({
     setEditParticipantSelections((current) => Array.from({ length: editParticipantCount }, (_, index) => current[index] ?? ''))
   }, [editParticipantCount])
   useEffect(() => {
-    const teamCount = editLayout?.teams?.length || 0
+    const teamCount = getTeamLayout(editParticipantCount, editMatchMode)?.teams?.length || 0
     setEditSavedTeamSelections((current) => Array.from({ length: teamCount }, (_, index) => current[index] ?? ''))
   }, [editParticipantCount, editMatchMode])
   useEffect(() => {
     setEditingMatchId(null)
     resetEditSegmentForm()
+    setComposerMode('match')
+    setSelectedBoardItemKey(null)
   }, [selectedEventId])
 
   const activeShowNames = useMemo(
@@ -596,6 +604,8 @@ export default function DayMatchesModal({
 
   const bookingWrestlers = getAvailableWrestlers()
   const bookingTitles = getAvailableTitles(participantCount, matchMode)
+  const editWrestlers = getAvailableWrestlers(editingMatch ? getParticipantIdsFromMatch(editingMatch) : [])
+  const editTitles = getAvailableTitles(editParticipantCount, editMatchMode, editingMatch?.titleId ?? null)
   const activeStories = useMemo(() => stories.filter((story) => story.status !== 'Concluded'), [stories])
 
   const getSuggestedStories = (participantIds = []) => {
@@ -652,7 +662,25 @@ export default function DayMatchesModal({
     setMatchFormKey((current) => current + 1)
   }
 
+  const applyMatchTemplate = (count, mode = null) => {
+    const safeMode = normalizeMode(count, mode || getAllowedModes(count)[0])
+    setComposerMode('match')
+    setParticipantCount(count)
+    setMatchMode(safeMode)
+    setBookingParticipantSelections(Array.from({ length: count }, () => ''))
+    setBookingSavedTeamSelections(Array.from({ length: getTeamLayout(count, safeMode).teams.length }, () => ''))
+    setMatchFormKey((current) => current + 1)
+  }
+
+  const applySegmentTemplate = (categoryKey, type = null) => {
+    setComposerMode('segment')
+    setSegCategory(categoryKey)
+    setSegType(type)
+  }
+
   const startEditingSegment = (segment) => {
+    setComposerMode('segment')
+    setSelectedBoardItemKey(`segment:${segment.id}`)
     setEditingSegmentId(segment.id)
     setEditSegTitle(segment.title || '')
     setEditSegDescription(segment.description || '')
@@ -709,6 +737,8 @@ export default function DayMatchesModal({
 
   const startEditingMatch = (match) => {
     const ids = getParticipantIdsFromMatch(match)
+    setComposerMode('match')
+    setSelectedBoardItemKey(`match:${match.id}`)
     setEditingMatchId(match.id)
     setEditParticipantCount(ids.length || 2)
     setEditMatchMode(normalizeMode(ids.length || 2, match.mode || 'free_for_all'))
@@ -936,11 +966,7 @@ export default function DayMatchesModal({
   }
 
   const handleWinnerSelect = (matchId, winnerId) => {
-    const finishType = winnerFinishTypes[matchId] || ''
-    if (!finishType) {
-      showToast?.('Select a finish type before setting the winner')
-      return
-    }
+    const finishType = winnerFinishTypes[matchId] || FINISH_TYPES[0]
     onSetWinner?.(matchId, winnerId, finishType)
   }
 
@@ -966,6 +992,20 @@ export default function DayMatchesModal({
   const clearDragState = () => {
     setDraggedItem(null)
     setDragOverKey(null)
+  }
+
+  const focusBoardItem = (item) => {
+    const key = getDayCardItemKey(item)
+    setSelectedBoardItemKey(key)
+
+    if (item.kind === 'match') {
+      setComposerMode('match')
+      if (isCurrentDay && canEditMatch(item.match)) startEditingMatch(item.match)
+      return
+    }
+
+    setComposerMode('segment')
+    if (isCurrentDay && onUpdateSegment) startEditingSegment(item.segment)
   }
 
   const handleBookSubmit = (e) => {
@@ -995,7 +1035,11 @@ export default function DayMatchesModal({
   const activeCategoryTypes = segCategory
     ? SEGMENT_CATEGORIES.find((c) => c.key === segCategory)?.types ?? []
     : []
+  const editActiveCategoryTypes = editSegCategory
+    ? SEGMENT_CATEGORIES.find((category) => category.key === editSegCategory)?.types ?? []
+    : []
   const specialEvent = selectedEvent?.kind === 'special' ? selectedEvent : null
+  const weeklyEvent = !specialEvent ? selectedEvent : null
   const primaryBrand = selectedEvent || dayEvents[0] || null
   const accentColor = specialEvent?.color || primaryBrand?.color || 'var(--gold)'
   const isCompactLayout = viewportWidth <= 1180
@@ -1003,6 +1047,25 @@ export default function DayMatchesModal({
   const bookingTeamGridColumns = isPhoneLayout ? '1fr' : `repeat(${bookingLayout.teams.length}, minmax(0, 1fr))`
   const twoColumnOptionGrid = isPhoneLayout ? '1fr' : '1fr 1fr'
   const completedMatches = dayMatches.filter((match) => match.winnerId)
+  const quickMatchTemplates = [
+    { label: 'Singles', count: 2, mode: 'singles' },
+    { label: 'Triple Threat', count: 3, mode: 'free_for_all' },
+    { label: 'Tag Team', count: 4, mode: 'tag' },
+    { label: 'Six-Man Tag', count: 6, mode: 'trios' },
+    { label: 'Triple Threat Tag', count: 6, mode: '3tag' },
+    { label: '10-Person', count: 10, mode: 'free_for_all' },
+  ]
+  const quickSegmentTemplates = [
+    { label: 'Promo', category: 'promos', type: 'Promo (In-Ring)' },
+    { label: 'Brawl', category: 'brawls', type: 'In-Ring Brawl' },
+    { label: 'Challenge', category: 'story', type: 'Challenge Issued' },
+    { label: 'Contract', category: 'authority', type: 'Contract Signing' },
+    { label: 'Vignette', category: 'vignettes', type: 'Taped Vignette' },
+    { label: 'Celebration', category: 'celebrations', type: 'Celebration' },
+  ]
+  const producerTalent = (composerMode === 'segment' ? segmentWrestlers : bookingWrestlers).slice(0, 10)
+  const producerTitles = bookingTitles.slice(0, 6)
+  const producerStories = activeStories.slice(0, 6)
   const topRatedMatch = [...completedMatches]
     .filter((match) => match.rating != null)
     .sort((a, b) => (b.rating || 0) - (a.rating || 0))[0] || null
@@ -1010,8 +1073,8 @@ export default function DayMatchesModal({
 
   return (
     <Modal title={titleStr} onClose={onClose} style={{ maxWidth: isCurrentDay ? '1600px' : '800px', width: '100%' }}>
-      {specialEvent && (
-        <div className="booking-hero">
+        {specialEvent && (
+          <div className="booking-hero" style={{ '--event-accent': accentColor }}>
           <div className="booking-hero-content">
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <div>
@@ -1021,6 +1084,29 @@ export default function DayMatchesModal({
                 </div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900, lineHeight: 1, marginTop: 8, color: 'var(--text)' }}>{specialEvent.name}</div>
                 <div style={{ fontSize: 14, color: 'var(--text3)', marginTop: 12, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>{specialEvent.brandName} presentation</div>
+              </div>
+              <div style={{ display: 'grid', gap: 10, minWidth: 200, padding: '12px 20px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Booked Matches: <strong className="electric-text">{dayMatches.length}</strong></div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Booked Segments: <strong style={{ color: 'var(--purple)' }}>{daySegments.length}</strong></div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Title Matches: <strong style={{ color: 'var(--gold)' }}>{titleChanges.length}</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+        {weeklyEvent && isCurrentDay && (
+          <div className="booking-hero booking-hero--weekly" style={{ '--event-accent': accentColor }}>
+          <div className="booking-hero-content">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div>
+                <div className="electric-text" style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 2 }}>
+                  <FiActivity style={{ marginRight: 8 }} />
+                  Weekly Broadcast
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 36, fontWeight: 900, lineHeight: 1, marginTop: 8, color: 'var(--text)' }}>{weeklyEvent.name}</div>
+                <div style={{ fontSize: 14, color: 'var(--text3)', marginTop: 12, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                  {weeklyEvent.brandName || weeklyEvent.name} • Live event card shaping
+                </div>
               </div>
               <div style={{ display: 'grid', gap: 10, minWidth: 200, padding: '12px 20px', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>Booked Matches: <strong className="electric-text">{dayMatches.length}</strong></div>
@@ -1097,127 +1183,99 @@ export default function DayMatchesModal({
 
         {isCurrentDay && (
           <div className="booking-modal-column booking-modal-column--left">
-            <SectionCard title="Book Match" icon={FiAward}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Wrestlers Filter</label>
-                  <select value={wrestlerFilter} onChange={(e) => setWrestlerFilter(e.target.value)} style={smallSelectStyle}>
-                    <option value="current">Current show</option>
-                    <option value="all">All brands</option>
-                    {availableShowOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Titles Filter</label>
-                  <select value={titleFilter} onChange={(e) => setTitleFilter(e.target.value)} style={smallSelectStyle}>
-                    <option value="current">Current show</option>
-                    <option value="all">All brands</option>
-                    {availableShowOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+            <SectionCard title="Producer Rail" icon={FiLayers}>
+              <div className="producer-rail-group">
+                <div className="producer-rail-label">Composer</div>
+                <div className="producer-mode-toggle">
+                  <button type="button" className={`producer-mode-btn${composerMode === 'match' ? ' active' : ''}`} onClick={() => setComposerMode('match')}>
+                    <FiAward /> Match
+                  </button>
+                  <button type="button" className={`producer-mode-btn${composerMode === 'segment' ? ' active' : ''}`} onClick={() => setComposerMode('segment')}>
+                    <FiMic /> Segment
+                  </button>
                 </div>
               </div>
 
-              <form key={matchFormKey} onSubmit={handleBookSubmit}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Participants</label>
-                    <select name="participantCount" value={participantCount} onChange={(e) => setParticipantCount(parseInt(e.target.value, 10))} style={smallSelectStyle}>
-                      {ALLOWED_PARTICIPANT_COUNTS.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  {getAllowedModes(participantCount).length > 1 && (
-                    <div>
-                      <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Match Style</label>
-                      <select name="mode" value={matchMode} onChange={(e) => setMatchMode(e.target.value)} style={smallSelectStyle}>
-                        {getAllowedModes(participantCount).map((m) => <option key={m} value={m}>{getMatchTypeLabel(participantCount, m)}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-                  Match Type: <strong>{getMatchTypeLabel(participantCount, matchMode)}</strong>
-                </div>
-
-                {!bookingLayout.isTeamBased && (
-                  <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
-                    {Array.from({ length: participantCount }).map((_, i) => (
-                      <select key={i} name={`participant_${i}`} value={bookingParticipantSelections[i] ?? ''} onChange={(e) => updateBookingParticipantSlot(i, e.target.value)} style={selectStyle}>
-                        <option value="">Participant {i + 1}</option>
-                        {getAvailableWrestlersForSlot(bookingWrestlers, bookingParticipantSelections, i).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      </select>
+              {!editingMatchId && !editingSegmentId && composerMode === 'match' && (
+                <div className="producer-rail-group">
+                  <div className="producer-rail-label">Quick Match Templates</div>
+                  <div className="producer-chip-grid">
+                    {quickMatchTemplates.map((template) => (
+                      <button
+                        key={`${template.count}-${template.mode}`}
+                        type="button"
+                        className="producer-chip"
+                        onClick={() => applyMatchTemplate(template.count, template.mode)}
+                      >
+                        {template.label}
+                      </button>
                     ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {bookingLayout.isTeamBased && (
-                  <div style={{ display: 'grid', gridTemplateColumns: bookingTeamGridColumns, gap: 12, marginBottom: 12 }}>
-                    {bookingLayout.teams.map((team, teamIndex) => (
-                      <div key={team.label}>
-                        {bookingEligibleTeams.length > 0 && (
-                          <div style={{ marginBottom: 8 }}>
-                            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                            <select name={`team${teamIndex}_saved`} value={bookingSavedTeamSelections[teamIndex] ?? ''} onChange={(e) => applySavedTeamToBooking(teamIndex, e.target.value)} style={selectStyle}>
-                              <option value="">Manual selection</option>
-                              {bookingEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
-                            </select>
-                          </div>
-                        )}
-                        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
-                        <div style={{ display: 'grid', gap: 8 }}>
-                          {Array.from({ length: team.size }).map((_, i) => (
-                            <select
-                              key={i}
-                              name={`team${teamIndex}_${i}`}
-                              value={bookingParticipantSelections[bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0) + i] ?? ''}
-                              onChange={(e) => updateBookingParticipantSlot(bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0) + i, e.target.value)}
-                              style={selectStyle}
-                            >
-                              <option value="">Select wrestler</option>
-                              {getAvailableWrestlersForSlot(bookingWrestlers, bookingParticipantSelections, bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0) + i).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                            </select>
-                          ))}
-                        </div>
+              {!editingMatchId && !editingSegmentId && composerMode === 'segment' && (
+                <div className="producer-rail-group">
+                  <div className="producer-rail-label">Quick Segment Templates</div>
+                  <div className="producer-chip-grid">
+                    {quickSegmentTemplates.map((template) => (
+                      <button
+                        key={`${template.category}-${template.type}`}
+                        type="button"
+                        className="producer-chip"
+                        onClick={() => applySegmentTemplate(template.category, template.type)}
+                      >
+                        {template.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="producer-rail-group">
+                <div className="producer-rail-label">Available Talent</div>
+                <div className="producer-mini-list">
+                  {producerTalent.map((wrestler) => (
+                    <div key={wrestler.id} className="producer-mini-row">
+                      <div>
+                        <div className="producer-mini-title">{wrestler.name}</div>
+                        <div className="producer-mini-meta">{wrestler.show || 'Universe'}</div>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label>Stipulation (optional)</label>
-                  <input name="stipulation" defaultValue="" placeholder="e.g. Casket Match, No DQ, Iron Man"  />
+                    </div>
+                  ))}
+                  {producerTalent.length === 0 && <div className="producer-empty-copy">No talent in current filter.</div>}
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label>Title on the line (optional)</label>
-                  <select name="titleId" defaultValue="" style={selectStyle}>
-                    <option value="">- No title match -</option>
-                    {bookingTitles.map((t) => {
-                      const champNames = getChampIds(t).map((id) => getW(id)?.name).filter(Boolean)
-                      return <option key={t.id} value={t.id}>{t.name} [{getTitleType(t)}] {champNames.length > 0 ? `(C: ${champNames.join(' / ')})` : '(Vacant)'}</option>
-                    })}
-                  </select>
+              <div className="producer-rail-group">
+                <div className="producer-rail-label">Story Hooks</div>
+                <div className="producer-mini-list">
+                  {producerStories.map((story) => (
+                    <div key={story.id} className="producer-mini-row">
+                      <div>
+                        <div className="producer-mini-title">{story.name}</div>
+                        <div className="producer-mini-meta">{story.type} • {story.status}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {producerStories.length === 0 && <div className="producer-empty-copy">No active stories available.</div>}
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label>Story Link (optional)</label>
-                  <select name="storyId" defaultValue="auto" style={selectStyle}>
-                    <option value="">- No linked story -</option>
-                    <option value="auto">Auto-detect from participants</option>
-                    {activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}
-                  </select>
+              <div className="producer-rail-group">
+                <div className="producer-rail-label">Belts In Orbit</div>
+                <div className="producer-mini-list">
+                  {producerTitles.map((title) => (
+                    <div key={title.id} className="producer-mini-row">
+                      <div>
+                        <div className="producer-mini-title">{title.name}</div>
+                        <div className="producer-mini-meta">{getTitleType(title)}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {producerTitles.length === 0 && <div className="producer-empty-copy">No compatible titles in this filter.</div>}
                 </div>
-
-                <div className="form-group">
-                  <label>Match Notes</label>
-                  <textarea name="notes" defaultValue="" placeholder="What happened in the match?" rows={5}  />
-                </div>
-
-                <div className="form-actions">
-                  <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-                  <button type="submit" className="btn btn-primary">Book Match</button>
-                </div>
-              </form>
+              </div>
             </SectionCard>
           </div>
         )}
@@ -1241,10 +1299,6 @@ export default function DayMatchesModal({
                     const seg = item.segment
                     const taggedWrestlers = (seg.wrestlerIds || []).map((id) => getW(id)).filter(Boolean)
                     const typeColor = segmentTypeBadgeColor(seg.segmentType)
-                    const isEditingThisSegment = editingSegmentId === seg.id
-                    const editActiveCategoryTypes = editSegCategory
-                      ? SEGMENT_CATEGORIES.find((category) => category.key === editSegCategory)?.types ?? []
-                      : []
                     return (
                       <div key={`segment-${seg.storyId}-${seg.segmentIndex}`}
                         ref={(node) => {
@@ -1252,6 +1306,7 @@ export default function DayMatchesModal({
                           if (node) dayCardRefs.current.set(key, node)
                           else dayCardRefs.current.delete(key)
                         }}
+                        onClick={() => focusBoardItem(item)}
                         draggable={isCurrentDay}
                         onDragStart={() => handleDragStart(item)}
                         onDragEnd={clearDragState}
@@ -1259,8 +1314,14 @@ export default function DayMatchesModal({
                         onDrop={() => handleDrop(item)}
                         className="show-card-item segment"
                         style={{
+                          cursor: 'pointer',
                           opacity: draggedItem && dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 0.92 : 1,
-                          boxShadow: dragOverKey === `${item.kind}:${item.id ?? item.segmentId}` ? 'var(--glow-heat)' : 'none',
+                          boxShadow:
+                            dragOverKey === `${item.kind}:${item.id ?? item.segmentId}`
+                              ? 'var(--glow-heat)'
+                              : selectedBoardItemKey === getDayCardItemKey(item)
+                              ? '0 0 0 1px rgba(255, 90, 42, 0.22), 0 14px 30px rgba(0, 0, 0, 0.26)'
+                              : 'none',
                         }}
                       >
                         <div className="item-badge-row">
@@ -1273,112 +1334,29 @@ export default function DayMatchesModal({
                             )}
                             {seg.storyName && <span className="badge badge-dim">{seg.storyName}</span>}
                           </div>
-                          <div className="item-actions">
-                            {isCurrentDay && <FiActivity style={{ fontSize: 14, color: 'var(--text3)', marginRight: 4 }} title="Drag to reorder" />}
-                            <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}><FiChevronUp /></button>
-                            <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
-                            {isCurrentDay && onUpdateSegment && (
-                              <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => startEditingSegment(seg)}>
-                                <FiEdit3 />
-                              </button>
-                            )}
-                            {isCurrentDay && onDeleteSegment && (
-                              <button type="button" className="btn btn-icon btn-danger btn-sm" onClick={() => onDeleteSegment(seg.storyId, seg.segmentIndex, seg.id)}><FiTrash2 /></button>
-                            )}
-                          </div>
-                        </div>
-                        {!isEditingThisSegment && (
-                          <>
-                            {seg.title && <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 2 }}>{seg.title}</div>}
-                            {seg.description && <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{seg.description}</div>}
-                            {taggedWrestlers.length > 0 && (
-                              <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                {taggedWrestlers.map((w) => (
-                                  <span key={w.id} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 'var(--radius)', background: 'var(--bg2)', color: 'var(--text2)', border: '1px solid var(--border2)' }}>
-                                    {w.name}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        )}
-                        {isEditingThisSegment && (
-                          <div style={{ marginTop: 10, display: 'grid', gap: 12 }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label>Segment Title</label>
-                              <input value={editSegTitle} onChange={(e) => setEditSegTitle(e.target.value)} placeholder="Segment title"  />
-                            </div>
-
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label>Segment Description</label>
-                              <textarea value={editSegDescription} onChange={(e) => setEditSegDescription(e.target.value.slice(0, 3000))} rows={5}  />
-                            </div>
-
-                            <div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                <label style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Segment Type</label>
-                                {(editSegCategory || editSegType) && (
-                                  <button type="button" onClick={() => { setEditSegCategory(null); setEditSegType(null) }} style={{ background: 'none', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                                    Clear
-                                  </button>
-                                )}
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                                {SEGMENT_CATEGORIES.map((category) => (
-                                  <button
-                                    key={category.key}
-                                    type="button"
-                                    onClick={() => { setEditSegCategory(editSegCategory === category.key ? null : category.key); setEditSegType(null) }}
-                                    style={{
-                                      padding: '5px 10px', borderRadius: 'var(--radius)', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid',
-                                      background: editSegCategory === category.key ? 'var(--red, #c0392b)' : 'var(--bg2)',
-                                      borderColor: editSegCategory === category.key ? 'var(--red, #c0392b)' : 'var(--border2)',
-                                      color: editSegCategory === category.key ? '#fff' : 'var(--text)',
-                                    }}
-                                  >
-                                    {category.label}
-                                  </button>
-                                ))}
-                              </div>
-                              {editSegCategory && editActiveCategoryTypes.length > 0 && (
-                                <div style={{ display: 'grid', gridTemplateColumns: twoColumnOptionGrid, gap: 6 }}>
-                                  {editActiveCategoryTypes.map((type) => (
-                                    <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
-                                      <input type="radio" name={`editSegType-${seg.id}`} value={type} checked={editSegType === type} onChange={() => setEditSegType(type)} style={{ accentColor: 'var(--red, #c0392b)', cursor: 'pointer' }} />
-                                      {type}
-                                    </label>
-                                  ))}
-                                </div>
+                            <div className="item-actions">
+                              {isCurrentDay && <FiActivity style={{ fontSize: 14, color: 'var(--text3)', marginRight: 4 }} title="Drag to reorder" />}
+                              <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'up')} disabled={i === 0}><FiChevronUp /></button>
+                              <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
+                              {isCurrentDay && onDeleteSegment && (
+                                <button type="button" className="btn btn-icon btn-danger btn-sm" onClick={() => onDeleteSegment(seg.storyId, seg.segmentIndex, seg.id)}><FiTrash2 /></button>
                               )}
                             </div>
-
-                            <div>
-                              <label style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', marginBottom: 4 }}>Tagged Wrestlers</label>
-                              <input value={editSegWrestlerSearch} onChange={(e) => setEditSegWrestlerSearch(e.target.value)} placeholder="Search by name..." style={{ width: '100%', background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)', padding: '7px 10px', borderRadius: 'var(--radius)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-                              <select value={editSegWrestlerBrand} onChange={(e) => setEditSegWrestlerBrand(e.target.value)} style={{ ...smallSelectStyle, fontSize: 12, marginBottom: 8 }}>
-                                <option value="all">All Brands</option>
-                                <option value="current">Current Show</option>
-                                {availableShowOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                              </select>
-                              <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--border2)', borderRadius: 'var(--radius)', background: 'var(--bg2)' }}>
-                                {editSegmentWrestlers.length === 0 ? (
-                                  <div style={{ padding: 12, fontSize: 12, color: 'var(--text2)', textAlign: 'center' }}>No wrestlers found</div>
-                                ) : (
-                                  editSegmentWrestlers.map((w) => (
-                                    <label key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
-                                      <input type="checkbox" checked={editSegSelectedWrestlers.includes(w.id)} onChange={() => toggleEditSegWrestler(w.id)} style={{ accentColor: 'var(--red, #c0392b)', cursor: 'pointer' }} />
-                                      <span style={{ fontSize: 13, color: 'var(--text)' }}>{w.name}</span>
-                                      {w.show && <span style={{ fontSize: 10, color: 'var(--text2)', marginLeft: 'auto' }}>{w.show}</span>}
-                                    </label>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="form-actions">
-                              <button type="button" className="btn btn-secondary" onClick={resetEditSegmentForm}>Cancel</button>
-                              <button type="button" className="btn btn-primary" onClick={saveEditedSegment} disabled={!editSegTitle.trim()}>Save Segment</button>
-                            </div>
+                          </div>
+                        {seg.title && <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 2 }}>{seg.title}</div>}
+                        {seg.description && <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{seg.description}</div>}
+                        {taggedWrestlers.length > 0 && (
+                          <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {taggedWrestlers.map((w) => (
+                              <span key={w.id} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 'var(--radius)', background: 'var(--bg2)', color: 'var(--text2)', border: '1px solid var(--border2)' }}>
+                                {w.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {isCurrentDay && onUpdateSegment && (
+                          <div className="board-card-hint">
+                            {selectedBoardItemKey === getDayCardItemKey(item) ? 'Editing in inspector' : 'Click card to edit in inspector'}
                           </div>
                         )}
                       </div>
@@ -1390,7 +1368,6 @@ export default function DayMatchesModal({
                   const participants = participantIds.map((id) => getW(id)).filter(Boolean)
                   const teams = getTeamsFromMatch(m)
                   const titleMatch = titles.find((t) => t.id === m.titleId)
-                  const isEditingThisMatch = editingMatchId === m.id
                   return (
                     <div key={m.id}
                       ref={(node) => {
@@ -1398,17 +1375,25 @@ export default function DayMatchesModal({
                         if (node) dayCardRefs.current.set(key, node)
                         else dayCardRefs.current.delete(key)
                       }}
+                      onClick={() => focusBoardItem(item)}
                       draggable={isCurrentDay}
                       onDragStart={() => handleDragStart(item)}
                       onDragEnd={clearDragState}
                       onDragOver={(e) => handleDragOver(e, item)}
                       onDrop={() => handleDrop(item)}
-                      className="show-card-item match"
-                      style={{
-                        opacity: draggedItem && dragOverKey === `${item.kind}:${item.id}` ? 0.92 : 1,
-                        boxShadow: dragOverKey === `${item.kind}:${item.id}` ? 'var(--glow-heat)' : 'none',
-                      }}
-                    >
+                        className="show-card-item match"
+                        style={{
+                          '--event-accent': accentColor,
+                          cursor: 'pointer',
+                          opacity: draggedItem && dragOverKey === `${item.kind}:${item.id}` ? 0.92 : 1,
+                          boxShadow:
+                            dragOverKey === `${item.kind}:${item.id}`
+                              ? `0 0 0 1px ${accentColor}55, 0 14px 30px rgba(0, 0, 0, 0.26)`
+                              : selectedBoardItemKey === getDayCardItemKey(item)
+                              ? `0 0 0 1px ${accentColor}55, 0 14px 30px rgba(0, 0, 0, 0.26)`
+                              : 'none',
+                        }}
+                      >
                       <div className="item-badge-row">
                         <div className="item-badges">
                           <span className="badge badge-primary">MATCH {i + 1}</span>
@@ -1423,22 +1408,20 @@ export default function DayMatchesModal({
                           <button type="button" className="btn btn-icon btn-secondary btn-sm" onClick={() => handleMoveItem(item, 'down')} disabled={i === dayCardItems.length - 1}><FiChevronDown /></button>
                         </div>
                       </div>
-                      {!isEditingThisMatch && (
-                        <>
+                      <>
                           {!teams && (
                             <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
                               {!m.winnerId && (
                                 <div style={{ display: 'grid', gap: 6 }}>
-                                  <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
-                                  <select
-                                    value={winnerFinishTypes[m.id] || ''}
-                                    onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
-                                    style={selectStyle}
-                                  >
-                                    <option value="">- Required to set winner -</option>
-                                    {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
-                                  </select>
-                                </div>
+                                    <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
+                                    <select
+                                      value={winnerFinishTypes[m.id] || FINISH_TYPES[0]}
+                                      onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
+                                      style={selectStyle}
+                                    >
+                                      {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
+                                    </select>
+                                  </div>
                               )}
                               {participants.length >= 10 ? (
                                 <select
@@ -1463,16 +1446,15 @@ export default function DayMatchesModal({
                             <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
                               {!m.winnerId && (
                                 <div style={{ display: 'grid', gap: 6 }}>
-                                  <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
-                                  <select
-                                    value={winnerFinishTypes[m.id] || ''}
-                                    onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
-                                    style={selectStyle}
-                                  >
-                                    <option value="">- Required to set winner -</option>
-                                    {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
-                                  </select>
-                                </div>
+                                    <label style={{ fontSize: 12, color: 'var(--text2)' }}>Finish Type</label>
+                                    <select
+                                      value={winnerFinishTypes[m.id] || FINISH_TYPES[0]}
+                                      onChange={(e) => setWinnerFinishTypes((current) => ({ ...current, [m.id]: e.target.value }))}
+                                      style={selectStyle}
+                                    >
+                                      {FINISH_TYPES.map((finish) => <option key={finish} value={finish}>{finish}</option>)}
+                                    </select>
+                                  </div>
                               )}
                             <div style={{ display: 'grid', gridTemplateColumns: isPhoneLayout ? '1fr' : `repeat(${teams.length}, minmax(0, 1fr))`, gap: 12, alignItems: 'start' }}>
                               {teams.map((teamIds, teamIndex) => (
@@ -1513,117 +1495,31 @@ export default function DayMatchesModal({
                             />
                           </div>
 
-                          {m.notes && (
-                            <div className="item-notes" style={{ marginTop: 14 }}>
-                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExpandedNotesId(expandedNotesId === m.id ? null : m.id)}>
-                                {expandedNotesId === m.id ? 'Hide Notes' : 'Show Notes'}
+                      {m.notes && (
+                        <div className="item-notes" style={{ marginTop: 14 }}>
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExpandedNotesId(expandedNotesId === m.id ? null : m.id)}>
+                            {expandedNotesId === m.id ? 'Hide Notes' : 'Show Notes'}
                               </button>
                               {expandedNotesId === m.id && <p style={{ marginTop: 10, color: 'var(--text2)', lineHeight: 1.6 }}>{m.notes}</p>}
                             </div>
-                          )}
-
-                          {canEditMatch(m) && (
-                            <div className="form-actions" style={{ marginTop: 10 }}>
-                              <button type="button" className="btn btn-secondary" onClick={() => startEditingMatch(m)}>Edit Match</button>
-                              <button type="button" className="btn btn-danger" onClick={() => onDeleteMatch(m.id)}>Delete Match</button>
-                            </div>
-                          )}
-                        </>
                       )}
 
-                      {isEditingThisMatch && (
-                        <form onSubmit={(e) => handleUpdateSubmit(e, m)} style={{ marginTop: 12 }}>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Participants</label>
-                              <select name="participantCount" value={editParticipantCount} onChange={(e) => setEditParticipantCount(parseInt(e.target.value, 10))} style={smallSelectStyle}>
-                                {ALLOWED_PARTICIPANT_COUNTS.map((c) => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                            </div>
-                            {getAllowedModes(editParticipantCount).length > 1 && (
-                              <div>
-                                <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Match Style</label>
-                                <select name="mode" value={editMatchMode} onChange={(e) => setEditMatchMode(e.target.value)} style={smallSelectStyle}>
-                                  {getAllowedModes(editParticipantCount).map((m) => <option key={m} value={m}>{getMatchTypeLabel(editParticipantCount, m)}</option>)}
-                                </select>
-                              </div>
-                            )}
-                          </div>
-
-                          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-                            Match Type: <strong>{getMatchTypeLabel(editParticipantCount, editMatchMode)}</strong>
-                          </div>
-
-                          {!editLayout.isTeamBased && (
-                            <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
-                              {Array.from({ length: editParticipantCount }).map((_, index) => (
-                                <select key={index} name={`participant_${index}`} value={editParticipantSelections[index] ?? ''} onChange={(e) => updateEditParticipantSlot(index, e.target.value)} style={{ ...selectStyle, width: '100%' }}>
-                                  <option value="">Participant {index + 1}</option>
-                                  {getAvailableWrestlersForSlot(editWrestlers, editParticipantSelections, index).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                </select>
-                              ))}
-                            </div>
-                          )}
-
-                          {editLayout.isTeamBased && (
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${editLayout.teams.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 12 }}>
-                              {(() => {
-                                return editLayout.teams.map((team, teamIndex) => {
-                                  const teamStart = editLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0)
-                                  return (
-                                    <div key={team.label}>
-                                      {editEligibleTeams.length > 0 && (
-                                        <div style={{ marginBottom: 8 }}>
-                                          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
-                                          <select name={`team${teamIndex}_saved`} value={editSavedTeamSelections[teamIndex] ?? ''} onChange={(e) => applySavedTeamToEdit(teamIndex, e.target.value)} style={{ ...selectStyle, width: '100%' }}>
-                                            <option value="">Manual selection</option>
-                                            {editEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
-                                          </select>
-                                        </div>
-                                      )}
-                                      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
-                                      <div style={{ display: 'grid', gap: 8 }}>
-                                        {Array.from({ length: team.size }).map((_, index) => (
-                                          <select key={index} name={`team${teamIndex}_${index}`} value={editParticipantSelections[teamStart + index] ?? ''} onChange={(e) => updateEditParticipantSlot(teamStart + index, e.target.value)} style={{ ...selectStyle, width: '100%' }}>
-                                            <option value="">Select wrestler</option>
-                                            {getAvailableWrestlersForSlot(editWrestlers, editParticipantSelections, teamStart + index).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                          </select>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )
-                                })
-                              })()}
-                            </div>
-                          )}
-
-                          <div className="form-group">
-                            <label>Stipulation (optional)</label>
-                            <input name="stipulation" defaultValue={m.stipulation || ''} placeholder="e.g. Casket Match, No DQ, Iron Man" style={{ ...selectStyle, width: '100%' }} />
-                          </div>
-
-                          <div className="form-group">
-                            <label>Title on the line (optional)</label>
-                            <select name="titleId" defaultValue={m.titleId ?? ''} style={{ ...selectStyle, flex: 'unset', width: '100%' }}>
-                              <option value="">- No title match -</option>
-                              {editTitles.map((t) => {
-                                const champNames = getChampIds(t).map((id) => getW(id)?.name).filter(Boolean)
-                                return <option key={t.id} value={t.id}>{t.name} [{getTitleType(t)}] {champNames.length > 0 ? `(C: ${champNames.join(' / ')})` : '(Vacant)'}</option>
-                              })}
-                            </select>
-                          </div>
-
-                          <div className="form-group">
-                            <label>Match Notes</label>
-                            <textarea name="notes" defaultValue={m.notes || ''} placeholder="What happened in the match?" rows={4} style={{ ...selectStyle, width: '100%', resize: 'vertical' }} />
-                          </div>
-
-                          <div className="form-actions">
-                            <button type="button" className="btn btn-secondary" onClick={() => setEditingMatchId(null)}>Cancel</button>
-                            <button type="submit" className="btn btn-primary">Save Match</button>
-                          </div>
-                        </form>
+                      {isCurrentDay && (
+                        <div className="board-card-hint">
+                          {canEditMatch(m)
+                            ? selectedBoardItemKey === getDayCardItemKey(item)
+                              ? 'Editing in inspector'
+                              : 'Click card to edit in inspector'
+                            : 'Result locked after winner is set'}
+                        </div>
                       )}
+
+                      {canEditMatch(m) && (
+                        <div className="form-actions" style={{ marginTop: 10 }}>
+                          <button type="button" className="btn btn-danger" onClick={() => onDeleteMatch(m.id)}>Delete Match</button>
+                        </div>
+                      )}
+                      </>
                     </div>
                   )
                 })}
@@ -1689,12 +1585,190 @@ export default function DayMatchesModal({
 
         {isCurrentDay && (
           <div className="booking-modal-column booking-modal-column--right">
-            <SectionCard title="Book Segment" icon={FiMic}>
-              <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 0, marginBottom: 14 }}>
-                Book a promo, interview, or other non-match segment.
-              </p>
+            <SectionCard title={editingMatchId ? 'Inspector • Editing Match' : editingSegmentId ? 'Inspector • Editing Segment' : composerMode === 'match' ? 'Inspector • Match Composer' : 'Inspector • Segment Composer'} icon={composerMode === 'match' ? FiAward : FiMic}>
+              {selectedBoardItem && (
+                <div className="inspector-summary">
+                  <div className="inspector-summary-label">
+                    {selectedBoardItem.kind === 'match' ? 'Selected Match' : 'Selected Segment'}
+                  </div>
+                  {selectedBoardItem.kind === 'match' ? (
+                    (() => {
+                      const match = selectedBoardItem.match
+                      const participantIds = getParticipantIdsFromMatch(match)
+                      const participantNames = participantIds.map((id) => getW(id)?.name).filter(Boolean)
+                      const linkedTitle = titles.find((title) => title.id === match.titleId)
+                      return (
+                        <>
+                          <div className="inspector-summary-title">
+                            {participantNames.join(' vs ') || 'Match slot'}
+                          </div>
+                          <div className="inspector-summary-meta">
+                            <span>{match.matchType || getMatchTypeLabel(participantIds.length, match.mode)}</span>
+                            {linkedTitle && <span>{linkedTitle.name}</span>}
+                            {match.stipulation && <span>{match.stipulation}</span>}
+                            {match.winnerId && <span>Winner: {getWinnerNamesFromMatch(match, getW).join(' / ')}</span>}
+                          </div>
+                        </>
+                      )
+                    })()
+                  ) : (
+                    (() => {
+                      const segment = selectedBoardItem.segment
+                      return (
+                        <>
+                          <div className="inspector-summary-title">
+                            {segment.title || segment.segmentType || 'Segment slot'}
+                          </div>
+                          <div className="inspector-summary-meta">
+                            {segment.segmentType && <span>{segment.segmentType}</span>}
+                            {segment.storyName && <span>{segment.storyName}</span>}
+                            {segment.wrestlerIds?.length > 0 && <span>{segment.wrestlerIds.length} tagged</span>}
+                          </div>
+                        </>
+                      )
+                    })()
+                  )}
+                </div>
+              )}
+              {composerMode === 'match' && (
+                <>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 0, marginBottom: 14 }}>
+                    Build the next match directly from the board. Use the rail for templates and quick roster context.
+                  </p>
 
-              <form onSubmit={handleBookSegment}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Wrestlers Filter</label>
+                      <select value={wrestlerFilter} onChange={(e) => setWrestlerFilter(e.target.value)} style={smallSelectStyle}>
+                        <option value="current">Current show</option>
+                        <option value="all">All brands</option>
+                        {availableShowOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Titles Filter</label>
+                      <select value={titleFilter} onChange={(e) => setTitleFilter(e.target.value)} style={smallSelectStyle}>
+                        <option value="current">Current show</option>
+                        <option value="all">All brands</option>
+                        {availableShowOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <form key={matchFormKey} onSubmit={handleBookSubmit}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Participants</label>
+                        <select name="participantCount" value={participantCount} onChange={(e) => setParticipantCount(parseInt(e.target.value, 10))} style={smallSelectStyle}>
+                          {ALLOWED_PARTICIPANT_COUNTS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      {getAllowedModes(participantCount).length > 1 && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Match Style</label>
+                          <select name="mode" value={matchMode} onChange={(e) => setMatchMode(e.target.value)} style={smallSelectStyle}>
+                            {getAllowedModes(participantCount).map((m) => <option key={m} value={m}>{getMatchTypeLabel(participantCount, m)}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
+                      Match Type: <strong>{getMatchTypeLabel(participantCount, matchMode)}</strong>
+                    </div>
+
+                    {!bookingLayout.isTeamBased && (
+                      <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
+                        {Array.from({ length: participantCount }).map((_, i) => (
+                          <select key={i} name={`participant_${i}`} value={bookingParticipantSelections[i] ?? ''} onChange={(e) => updateBookingParticipantSlot(i, e.target.value)} style={selectStyle}>
+                            <option value="">Participant {i + 1}</option>
+                            {getAvailableWrestlersForSlot(bookingWrestlers, bookingParticipantSelections, i).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                          </select>
+                        ))}
+                      </div>
+                    )}
+
+                    {bookingLayout.isTeamBased && (
+                      <div style={{ display: 'grid', gridTemplateColumns: bookingTeamGridColumns, gap: 12, marginBottom: 12 }}>
+                        {bookingLayout.teams.map((team, teamIndex) => {
+                          const teamOffset = bookingLayout.teams.slice(0, teamIndex).reduce((sum, currentTeam) => sum + currentTeam.size, 0)
+                          return (
+                            <div key={team.label}>
+                              {bookingEligibleTeams.length > 0 && (
+                                <div style={{ marginBottom: 8 }}>
+                                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>Saved {team.size === 2 ? 'Tag Team' : 'Trios Team'}</div>
+                                  <select name={`team${teamIndex}_saved`} value={bookingSavedTeamSelections[teamIndex] ?? ''} onChange={(e) => applySavedTeamToBooking(teamIndex, e.target.value)} style={selectStyle}>
+                                    <option value="">Manual selection</option>
+                                    {bookingEligibleTeams.map((eligibleTeam) => <option key={eligibleTeam.id} value={eligibleTeam.id}>{eligibleTeam.name}</option>)}
+                                  </select>
+                                </div>
+                              )}
+                              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>{team.label}</div>
+                              <div style={{ display: 'grid', gap: 8 }}>
+                                {Array.from({ length: team.size }).map((_, i) => (
+                                  <select
+                                    key={i}
+                                    name={`team${teamIndex}_${i}`}
+                                    value={bookingParticipantSelections[teamOffset + i] ?? ''}
+                                    onChange={(e) => updateBookingParticipantSlot(teamOffset + i, e.target.value)}
+                                    style={selectStyle}
+                                  >
+                                    <option value="">Select wrestler</option>
+                                    {getAvailableWrestlersForSlot(bookingWrestlers, bookingParticipantSelections, teamOffset + i).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                  </select>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label>Stipulation (optional)</label>
+                      <input name="stipulation" defaultValue="" placeholder="e.g. Casket Match, No DQ, Iron Man" />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Title on the line (optional)</label>
+                      <select name="titleId" defaultValue="" style={selectStyle}>
+                        <option value="">- No title match -</option>
+                        {bookingTitles.map((t) => {
+                          const champNames = getChampIds(t).map((id) => getW(id)?.name).filter(Boolean)
+                          return <option key={t.id} value={t.id}>{t.name} [{getTitleType(t)}] {champNames.length > 0 ? `(C: ${champNames.join(' / ')})` : '(Vacant)'}</option>
+                        })}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Story Link (optional)</label>
+                      <select name="storyId" defaultValue="auto" style={selectStyle}>
+                        <option value="">- No linked story -</option>
+                        <option value="auto">Auto-detect from participants</option>
+                        {activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Match Notes</label>
+                      <textarea name="notes" defaultValue="" placeholder="What happened in the match?" rows={5} />
+                    </div>
+
+                    <div className="form-actions">
+                      <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+                      <button type="submit" className="btn btn-primary">Book Match</button>
+                    </div>
+                  </form>
+                </>
+              )}
+
+              {composerMode === 'segment' && (
+                <>
+                  <p style={{ fontSize: 12, color: 'var(--text2)', marginTop: 0, marginBottom: 14 }}>
+                    Book a promo, interview, or other non-match segment.
+                  </p>
+
+                  <form onSubmit={handleBookSegment}>
                 <div className="form-group">
                   <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Segment Title</label>
                   <input type="text" value={segTitle} onChange={(e) => setSegTitle(e.target.value)}
@@ -1801,7 +1875,9 @@ export default function DayMatchesModal({
                   <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
                   <button type="submit" className="btn btn-primary" disabled={!segTitle.trim()}>Book Segment</button>
                 </div>
-              </form>
+                  </form>
+                </>
+              )}
             </SectionCard>
           </div>
         )}

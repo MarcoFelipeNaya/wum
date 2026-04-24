@@ -59,7 +59,7 @@ export default function Nav({ current, onNavigate }) {
       </div>
 
       <div className="nav-sidebar-footer">
-        <div className="nav-sidebar-version">v1.0.3 Opening Bell</div>
+        <div className="nav-sidebar-version">v1.1.0 Opening Bell</div>
       </div>
     </nav>
   )

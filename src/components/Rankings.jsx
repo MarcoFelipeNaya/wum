@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { buildRankings } from '../utils/rankings.js'
 import { FiSearch, FiFilter, FiTrendingUp, FiTrendingDown, FiActivity, FiAward, FiZap, FiTarget, FiArrowUp, FiArrowDown } from 'react-icons/fi'
+import { FaFire, FaSnowflake } from 'react-icons/fa6'
 import './Rankings.css'
 
 function getWinPctClass(winPct) {
@@ -205,13 +206,13 @@ export default function Rankings({ state }) {
                   </td>
                   <td style={{ fontSize: 12, fontWeight: 700 }}>{row.record}</td>
                   <td>{row.matches}</td>
-                  <td>
-                    <span className={getStreakClass(row.streak)}>
-                      {row.streak >= 4 && <FiZap style={{ fontSize: 10 }} />}
-                      {row.streak <= -4 && <FiActivity style={{ fontSize: 10, opacity: 0.5 }} />}
-                      {row.streak > 0 ? `+${row.streak}` : row.streak}
-                    </span>
-                  </td>
+                    <td>
+                      <span className={getStreakClass(row.streak)}>
+                        {row.streak >= 4 && <FaFire style={{ fontSize: 10 }} />}
+                        {row.streak <= -4 && <FaSnowflake style={{ fontSize: 10 }} />}
+                        {row.streak > 0 ? `+${row.streak}` : row.streak}
+                      </span>
+                    </td>
                   <td>
                     {row.titles > 0 ? (
                       <span style={{ color: 'var(--gold)', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 4 }}>
