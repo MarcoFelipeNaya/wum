@@ -24,14 +24,35 @@ const MATCH_FORMATS = [
   { value: 'title', label: 'Title' },
 ]
 
+const RELATIONSHIP_STORY_MODE_TYPES = [
+  'Rival',
+  'Ally',
+  'Respect',
+  'Former Partner',
+  'Betrayed',
+  'Unfinished Business',
+  'Mentor',
+  'Student',
+  'Owes Favor',
+]
+
+const getRelationshipStoryModeValue = (type) => `relationship:${type}`
+
 const STORY_MODES = [
   { value: 'auto', label: 'Auto' },
+  { value: 'relationship_arc', label: 'Relationship Arc' },
+  ...RELATIONSHIP_STORY_MODE_TYPES.map((type) => ({
+    value: getRelationshipStoryModeValue(type),
+    label: type,
+  })),
   { value: 'title_chase', label: 'Title Chase' },
   { value: 'rivalry', label: 'Rivalry' },
   { value: 'faction_war', label: 'Faction War' },
   { value: 'comeback', label: 'Comeback Arc' },
   { value: 'underdog', label: 'Underdog Push' },
 ]
+
+const RIVALRY_RELATIONSHIP_TYPES = ['Rival', 'Former Partner', 'Betrayed', 'Unfinished Business', 'Respect']
 
 const SEGMENT_TYPE_OPTIONS = [
   'Random',
@@ -638,12 +659,14 @@ export default function Creative({
       return (title.show || 'Universe') === storyForm.show || title.show === 'Universe'
     })
     const mode = storyForm.mode === 'auto'
-      ? ['title_chase', 'rivalry', 'comeback', 'underdog', 'faction_war'][seed % 5]
+      ? ['relationship_arc', 'title_chase', 'rivalry', 'comeback', 'underdog', 'faction_war'][seed % 6]
       : storyForm.mode
-    const makeIdea = ({ name, templateKey = null, arcType = 'story', participants, hook, why, openingSegment, openingMatch, payoff }) => ({
+    const selectedRelationshipType = mode.startsWith('relationship:') ? mode.slice('relationship:'.length) : null
+    const makeIdea = ({ name, templateKey = null, arcType = 'story', arcLabel = arcType === 'rivalry' ? 'Rivalry Arc' : 'Story Arc', participants, hook, why, openingSegment, openingMatch, payoff }) => ({
       name,
       templateKey,
       arcType,
+      arcLabel,
       participants,
       hook,
       why,
@@ -718,15 +741,60 @@ export default function Creative({
       }
     }
 
-    if (mode === 'rivalry') {
+    if (mode === 'relationship_arc' || mode === 'rivalry' || selectedRelationshipType) {
       const eligibleIds = new Set(storyTalentPool.map((wrestler) => wrestler.id))
-      const relationshipTemplateOptions = relationships
+      const allowedRelationshipTypes = selectedRelationshipType
+        ? [selectedRelationshipType]
+        : mode === 'rivalry'
+        ? RIVALRY_RELATIONSHIP_TYPES
+        : null
+      const templatePool = RIVALRY_STORY_TEMPLATES.filter((template) => (
+        !allowedRelationshipTypes || template.relationshipTypes.some((type) => allowedRelationshipTypes.includes(type))
+      ))
+      const savedRelationshipTemplateOptions = relationships
+        .filter((relationship) => !allowedRelationshipTypes || allowedRelationshipTypes.includes(relationship.type))
         .filter((relationship) => (relationship.wrestlerIds || []).every((id) => eligibleIds.has(id)))
         .flatMap((relationship) => (
-          RIVALRY_STORY_TEMPLATES
+          templatePool
             .filter((template) => template.relationshipTypes.includes(relationship.type))
             .map((template) => ({ relationship, template }))
         ))
+      const inferableTypes = allowedRelationshipTypes || RELATIONSHIP_STORY_MODE_TYPES
+      const inferencePool = rotateBySeed(
+        [...storyTalentPool]
+          .sort((a, b) => {
+            const rankDiff = (rankMap.get(a.id)?.rank || 99) - (rankMap.get(b.id)?.rank || 99)
+            if (rankDiff !== 0) return rankDiff
+            return getIdleDays(b.id) - getIdleDays(a.id)
+          })
+          .slice(0, 24),
+        refreshIndex
+      )
+      const inferredRelationshipTemplateOptions = []
+      for (let firstIndex = 0; firstIndex < inferencePool.length; firstIndex += 1) {
+        for (let secondIndex = firstIndex + 1; secondIndex < inferencePool.length; secondIndex += 1) {
+          inferableTypes.forEach((type) => {
+            templatePool
+              .filter((template) => template.relationshipTypes.includes(type))
+              .forEach((template) => {
+                inferredRelationshipTemplateOptions.push({
+                  relationship: {
+                    id: `inferred-${type}-${inferencePool[firstIndex].id}-${inferencePool[secondIndex].id}`,
+                    wrestlerIds: [inferencePool[firstIndex].id, inferencePool[secondIndex].id],
+                    type,
+                    intensity: 3,
+                    note: '',
+                    inferred: true,
+                  },
+                  template,
+                })
+              })
+          })
+        }
+      }
+      const relationshipTemplateOptions = savedRelationshipTemplateOptions.length > 0
+        ? savedRelationshipTemplateOptions
+        : inferredRelationshipTemplateOptions
       const pickedTemplateOption = relationshipTemplateOptions[indexFromSeed(relationshipTemplateOptions, refreshIndex)]
       if (pickedTemplateOption) {
         const { relationship: pickedRelationship, template } = pickedTemplateOption
@@ -739,14 +807,16 @@ export default function Creative({
           name: template.name(templateContext),
           templateKey: template.key,
           arcType: ['Ally', 'Owes Favor'].includes(pickedRelationship.type) ? 'story' : 'rivalry',
+          arcLabel: selectedRelationshipType ? `${selectedRelationshipType} Arc` : mode === 'relationship_arc' ? 'Relationship Arc' : 'Rivalry Arc',
           participants: [{ type: 'wrestler', id: first.id }, { type: 'wrestler', id: second.id }],
           hook: template.hook(templateContext),
-          why: `${getRelationshipReason(pickedRelationship)} ${getTalentPickReason(first.id)} | ${getTalentPickReason(second.id)}`,
+          why: `${pickedRelationship.inferred ? `HeatSpark inferred a ${pickedRelationship.type.toLowerCase()} arc from the selected story mode.` : getRelationshipReason(pickedRelationship)} ${getTalentPickReason(first.id)} | ${getTalentPickReason(second.id)}`,
           openingSegment: template.openingSegment(templateContext),
           openingMatch: template.openingMatch(templateContext),
           payoff: template.payoff(templateContext),
         })
       }
+      return null
     }
 
     const rankedTalent = rankings
@@ -948,192 +1018,197 @@ export default function Creative({
       </div>
 
       <div className="creative-grid">
-        <section className="creative-panel creative-panel-match">
-          <div className="creative-panel-header">
-            <div>
-              <h2>Match Generator</h2>
-              <p>Pick a booking goal, choose a format, then let HeatSpark build a purposeful card idea.</p>
+        <div className="creative-main-stack">
+          <section className="creative-panel creative-panel-match glass">
+            <div className="creative-panel-header">
+              <div>
+                <h2>Match Generator</h2>
+                <p>Pick a booking goal, choose a format, then let HeatSpark build a purposeful card idea.</p>
+              </div>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => setMatchSeed((seed) => seed + 17)}>
+                <FiRefreshCw /> Refresh
+              </button>
             </div>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setMatchSeed((seed) => seed + 17)}>
-              <FiRefreshCw /> Refresh
-            </button>
-          </div>
 
-          <div className="creative-controls">
-            <label>
-              Brand
-              <select value={matchForm.show} onChange={(e) => setMatchForm((form) => ({ ...form, show: e.target.value }))}>
-                <option value="all">All Brands</option>
-                {showOptions.map((showName) => <option key={showName} value={showName}>{showName}</option>)}
-              </select>
-            </label>
-            <label>
-              Goal
-              <select value={matchForm.goal} onChange={(e) => setMatchForm((form) => ({ ...form, goal: e.target.value }))}>
-                {MATCH_GOALS.map((goal) => <option key={goal.value} value={goal.value}>{goal.label}</option>)}
-              </select>
-            </label>
-            <label>
-              Format
-              <select value={matchForm.format} onChange={(e) => setMatchForm((form) => ({ ...form, format: e.target.value }))}>
-                {MATCH_FORMATS.map((format) => <option key={format.value} value={format.value}>{format.label}</option>)}
-              </select>
-            </label>
-            <label className="creative-check">
-              <input type="checkbox" checked={matchForm.activeOnly} onChange={(e) => setMatchForm((form) => ({ ...form, activeOnly: e.target.checked }))} />
-              Active only
-            </label>
-            <label className="creative-check">
-              <input type="checkbox" checked={matchForm.avoidRematches} onChange={(e) => setMatchForm((form) => ({ ...form, avoidRematches: e.target.checked }))} />
-              Flag recent rematches
-            </label>
-          </div>
+            <div className="creative-controls">
+              <label>
+                Brand
+                <select value={matchForm.show} onChange={(e) => setMatchForm((form) => ({ ...form, show: e.target.value }))}>
+                  <option value="all">All Brands</option>
+                  {showOptions.map((showName) => <option key={showName} value={showName}>{showName}</option>)}
+                </select>
+              </label>
+              <label>
+                Goal
+                <select value={matchForm.goal} onChange={(e) => setMatchForm((form) => ({ ...form, goal: e.target.value }))}>
+                  {MATCH_GOALS.map((goal) => <option key={goal.value} value={goal.value}>{goal.label}</option>)}
+                </select>
+              </label>
+              <label>
+                Format
+                <select value={matchForm.format} onChange={(e) => setMatchForm((form) => ({ ...form, format: e.target.value }))}>
+                  {MATCH_FORMATS.map((format) => <option key={format.value} value={format.value}>{format.label}</option>)}
+                </select>
+              </label>
+              <label className="creative-check">
+                <input type="checkbox" checked={matchForm.activeOnly} onChange={(e) => setMatchForm((form) => ({ ...form, activeOnly: e.target.checked }))} />
+                Active only
+              </label>
+              <label className="creative-check">
+                <input type="checkbox" checked={matchForm.avoidRematches} onChange={(e) => setMatchForm((form) => ({ ...form, avoidRematches: e.target.checked }))} />
+                Flag recent rematches
+              </label>
+            </div>
 
-          {matchIdea ? (
-            <div className="creative-suggestion-card">
-              {/* icon + text grouped so button sits below, not to the right */}
-              <div className="creative-suggestion-card-top">
-                <div className="creative-suggestion-icon"><FiZap /></div>
-                <div>
-                  <div className="creative-suggestion-label">{matchIdea.goalLabel || (matchIdea.titleId ? 'Title Match' : 'Match Spark')}</div>
-                  <h3>{matchIdea.headline}</h3>
-                  <p>{matchIdea.reason}</p>
-                  <div className="creative-chip-row">
-                    <span>{matchIdea.mode}</span>
-                    {matchIdea.titleId && <span>championship</span>}
-                    {matchIdea.storyId && <span>story linked</span>}
+            {matchIdea ? (
+              <div className="creative-suggestion-card">
+                {/* icon + text grouped so button sits below, not to the right */}
+                <div className="creative-suggestion-card-top">
+                  <div className="creative-suggestion-icon"><FiZap /></div>
+                  <div>
+                    <div className="creative-suggestion-label">{matchIdea.goalLabel || (matchIdea.titleId ? 'Title Match' : 'Match Spark')}</div>
+                    <h3>{matchIdea.headline}</h3>
+                    <p>{matchIdea.reason}</p>
+                    <div className="creative-chip-row">
+                      <span>{matchIdea.mode}</span>
+                      {matchIdea.titleId && <span>championship</span>}
+                      {matchIdea.storyId && <span>story linked</span>}
+                    </div>
                   </div>
                 </div>
+                <button className="btn btn-primary" type="button" onClick={() => startBooking(matchIdea)}>
+                  <FiCalendar /> Book Match
+                </button>
               </div>
-              <button className="btn btn-primary" type="button" onClick={() => startBooking(matchIdea)}>
-                <FiCalendar /> Book Match
+            ) : (
+              <div className="creative-empty">Not enough eligible talent for this match type.</div>
+            )}
+
+          </section>
+
+          <section className="creative-panel creative-story-panel glass">
+            <div className="creative-panel-header">
+              <div>
+                <h2>Story Generator</h2>
+                <p>Build a full arc from rankings, titles, factions, momentum, alignment, and inactivity.</p>
+              </div>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => setStorySeed((seed) => seed + 17)}>
+                <FiRefreshCw /> Refresh
               </button>
             </div>
-          ) : (
-            <div className="creative-empty">Not enough eligible talent for this match type.</div>
-          )}
 
-        </section>
-
-        <section className="creative-panel creative-panel-segment">
-          <div className="creative-panel-header">
-            <div>
-              <h2>Segment Generator</h2>
-              <p>Turn active stories into promos, attacks, interviews, and card beats.</p>
+            <div className="creative-controls">
+              <label>
+                Brand
+                <select value={storyForm.show} onChange={(e) => setStoryForm((form) => ({ ...form, show: e.target.value }))}>
+                  <option value="all">All Brands</option>
+                  {showOptions.map((showName) => <option key={showName} value={showName}>{showName}</option>)}
+                </select>
+              </label>
+              <label>
+                Story Mode
+                <select value={storyForm.mode} onChange={(e) => setStoryForm((form) => ({ ...form, mode: e.target.value }))}>
+                  {STORY_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+                </select>
+              </label>
+              <label className="creative-check">
+                <input type="checkbox" checked={storyForm.activeOnly} onChange={(e) => setStoryForm((form) => ({ ...form, activeOnly: e.target.checked }))} />
+                Active only
+              </label>
             </div>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSegmentSeed((seed) => seed + 17)}>
-              <FiRefreshCw /> Refresh
-            </button>
-          </div>
 
-          <div className="creative-controls creative-controls-stack">
-            <label>
-              Brand
-              <select value={segmentForm.show} onChange={(e) => setSegmentForm((form) => ({ ...form, show: e.target.value }))}>
-                <option value="all">All Brands</option>
-                {showOptions.map((showName) => <option key={showName} value={showName}>{showName}</option>)}
-              </select>
-            </label>
-            <label>
-              Segment Type
-              <select value={segmentForm.type} onChange={(e) => setSegmentForm((form) => ({ ...form, type: e.target.value }))}>
-                {SEGMENT_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
-              </select>
-            </label>
-            <label>
-              Story
-              <select value={segmentForm.storyId} onChange={(e) => setSegmentForm((form) => ({ ...form, storyId: e.target.value }))}>
-                <option value="auto">Auto Pick</option>
-                {activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}
-              </select>
-            </label>
-          </div>
-
-          <div className="creative-segment-card">
-            <div className="creative-suggestion-label">{segmentIdea.segmentType}</div>
-            <h3>{segmentIdea.headline}</h3>
-            <p>{segmentIdea.description}</p>
-            <div className="creative-list-subtle">{segmentIdea.reason}</div>
-            <button className="btn btn-primary" type="button" onClick={() => setBooking({ idea: segmentIdea, draft: { ...segmentIdea }, date: currentDate, eventId: '', show: segmentForm.show })}>
-              <FiCalendar /> Book Segment
-            </button>
-          </div>
-        </section>
-
-        <section className="creative-panel creative-panel-cues">
-          <div className="creative-panel-header">
-            <div>
-              <h2>Assistant Cues</h2>
-              <p>Small pressure points the save is hinting at.</p>
-            </div>
-          </div>
-          <div className="creative-cue-list">
-            {assistantCues.map((cue) => (
-              <div key={`${cue.title}-${cue.detail}`} className="creative-cue">
-                <strong>{cue.title}</strong>
-                <span>{cue.detail}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="creative-panel creative-story-panel">
-          <div className="creative-panel-header">
-            <div>
-              <h2>Story Generator</h2>
-              <p>Build a full arc from rankings, titles, factions, momentum, alignment, and inactivity.</p>
-            </div>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setStorySeed((seed) => seed + 17)}>
-              <FiRefreshCw /> Refresh
-            </button>
-          </div>
-
-          <div className="creative-controls">
-            <label>
-              Brand
-              <select value={storyForm.show} onChange={(e) => setStoryForm((form) => ({ ...form, show: e.target.value }))}>
-                <option value="all">All Brands</option>
-                {showOptions.map((showName) => <option key={showName} value={showName}>{showName}</option>)}
-              </select>
-            </label>
-            <label>
-              Story Mode
-              <select value={storyForm.mode} onChange={(e) => setStoryForm((form) => ({ ...form, mode: e.target.value }))}>
-                {STORY_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
-              </select>
-            </label>
-            <label className="creative-check">
-              <input type="checkbox" checked={storyForm.activeOnly} onChange={(e) => setStoryForm((form) => ({ ...form, activeOnly: e.target.checked }))} />
-              Active only
-            </label>
-          </div>
-
-          {storyIdea ? (
-            <div className="creative-story-card">
-              <div className="creative-story-main">
-                <div className="creative-suggestion-label">{storyIdea.arcType === 'rivalry' ? 'Rivalry Arc' : 'Story Arc'}</div>
-                <h3>{storyIdea.name}</h3>
-                <p>{storyIdea.hook}</p>
-                <div className="creative-chip-row">
-                  {storyIdea.participants.map((participant) => (
-                    <span key={`${participant.type}-${participant.id}`}>{getStoryParticipantName(participant)}</span>
-                  ))}
+            {storyIdea ? (
+              <div className="creative-story-card">
+                <div className="creative-story-main">
+                  <div className="creative-suggestion-label">{storyIdea.arcLabel}</div>
+                  <h3>{storyIdea.name}</h3>
+                  <p>{storyIdea.hook}</p>
+                  <div className="creative-chip-row">
+                    {storyIdea.participants.map((participant) => (
+                      <span key={`${participant.type}-${participant.id}`}>{getStoryParticipantName(participant)}</span>
+                    ))}
+                  </div>
                 </div>
+                <div className="creative-story-outline">
+                  <div><span>Why</span><strong>{storyIdea.why}</strong></div>
+                  <div><span>Opening Segment</span><strong>{storyIdea.openingSegment}</strong></div>
+                  <div><span>Opening Match</span><strong>{storyIdea.openingMatch}</strong></div>
+                  <div><span>Payoff</span><strong>{storyIdea.payoff}</strong></div>
+                </div>
+                <button className="btn btn-primary" type="button" onClick={handleCreateStory}>
+                  <FiZap /> Create Story
+                </button>
               </div>
-              <div className="creative-story-outline">
-                <div><span>Why</span><strong>{storyIdea.why}</strong></div>
-                <div><span>Opening Segment</span><strong>{storyIdea.openingSegment}</strong></div>
-                <div><span>Opening Match</span><strong>{storyIdea.openingMatch}</strong></div>
-                <div><span>Payoff</span><strong>{storyIdea.payoff}</strong></div>
+            ) : (
+              <div className="creative-empty">Not enough eligible data to generate a story arc.</div>
+            )}
+          </section>
+        </div>
+
+        <div className="creative-side-stack">
+          <section className="creative-panel creative-panel-segment glass">
+            <div className="creative-panel-header">
+              <div>
+                <h2>Segment Generator</h2>
+                <p>Turn active stories into promos, attacks, interviews, and card beats.</p>
               </div>
-              <button className="btn btn-primary" type="button" onClick={handleCreateStory}>
-                <FiZap /> Create Story
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSegmentSeed((seed) => seed + 17)}>
+                <FiRefreshCw /> Refresh
               </button>
             </div>
-          ) : (
-            <div className="creative-empty">Not enough eligible data to generate a story arc.</div>
-          )}
-        </section>
+
+            <div className="creative-controls creative-controls-stack">
+              <label>
+                Brand
+                <select value={segmentForm.show} onChange={(e) => setSegmentForm((form) => ({ ...form, show: e.target.value }))}>
+                  <option value="all">All Brands</option>
+                  {showOptions.map((showName) => <option key={showName} value={showName}>{showName}</option>)}
+                </select>
+              </label>
+              <label>
+                Segment Type
+                <select value={segmentForm.type} onChange={(e) => setSegmentForm((form) => ({ ...form, type: e.target.value }))}>
+                  {SEGMENT_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>
+              <label>
+                Story
+                <select value={segmentForm.storyId} onChange={(e) => setSegmentForm((form) => ({ ...form, storyId: e.target.value }))}>
+                  <option value="auto">Auto Pick</option>
+                  {activeStories.map((story) => <option key={story.id} value={story.id}>{story.name}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <div className="creative-segment-card">
+              <div className="creative-suggestion-label">{segmentIdea.segmentType}</div>
+              <h3>{segmentIdea.headline}</h3>
+              <p>{segmentIdea.description}</p>
+              <div className="creative-list-subtle">{segmentIdea.reason}</div>
+              <button className="btn btn-primary" type="button" onClick={() => setBooking({ idea: segmentIdea, draft: { ...segmentIdea }, date: currentDate, eventId: '', show: segmentForm.show })}>
+                <FiCalendar /> Book Segment
+              </button>
+            </div>
+          </section>
+
+          <section className="creative-panel creative-panel-cues glass">
+            <div className="creative-panel-header">
+              <div>
+                <h2>Assistant Cues</h2>
+                <p>Small pressure points the save is hinting at.</p>
+              </div>
+            </div>
+            <div className="creative-cue-list">
+              {assistantCues.map((cue) => (
+                <div key={`${cue.title}-${cue.detail}`} className="creative-cue">
+                  <strong>{cue.title}</strong>
+                  <span>{cue.detail}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
       </div>
 
       {booking && (() => {
@@ -1232,19 +1307,19 @@ export default function Creative({
             )}
 
             <div className="creative-schedule-grid">
-              <div className="form-group">
-                <label>Available Date</label>
+              <label>
+                Available Date
                 <select value={booking.date} onChange={(e) => setBooking((current) => ({ ...current, date: e.target.value, eventId: '' }))}>
                   {bookingOptions.map((option) => <option key={option.date} value={option.date}>{getBookingOptionLabel(option)}</option>)}
                 </select>
-              </div>
-              <div className="form-group">
-                <label>Event Card</label>
+              </label>
+              <label>
+                Event Card
                 <select value={booking.eventId} onChange={(e) => setBooking((current) => ({ ...current, eventId: e.target.value }))}>
                   <option value="">Select Event</option>
                   {bookingEventOptions.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
                 </select>
-              </div>
+              </label>
             </div>
             <div className="form-actions" style={{ marginTop: 24 }}>
               <button className="btn btn-secondary" type="button" onClick={() => setBooking(null)}>Cancel</button>

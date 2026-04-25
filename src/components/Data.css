@@ -156,6 +156,61 @@
   color: var(--text3);
 }
 
+.data-reset-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.data-reset-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 180px;
+  padding: 18px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.data-reset-card:hover {
+  background: var(--bg4);
+  border-color: rgba(255, 90, 54, 0.28);
+}
+
+.data-reset-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.data-reset-card-header span {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.data-reset-card-header strong {
+  color: var(--text3);
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.data-reset-copy {
+  color: var(--text3);
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.data-reset-card .btn {
+  align-self: flex-start;
+  min-width: 120px;
+}
+
 @media (max-width: 900px) {
   .data-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .data-action-grid { grid-template-columns: 1fr; }

@@ -30,6 +30,9 @@ const PAGES = [
   { id: 'data', label: 'Data', icon: FiDatabase },
 ]
 
+const versionNumber = import.meta.env.VITE_APP_VERSION || '1.2.0'
+const versionName = import.meta.env.VITE_APP_VERSION_NAME || 'Heat Spark'
+
 export default function Nav({ current, onNavigate }) {
   return (
     <nav className="nav-sidebar">
@@ -61,7 +64,7 @@ export default function Nav({ current, onNavigate }) {
       </div>
 
       <div className="nav-sidebar-footer">
-        <div className="nav-sidebar-version">v1.2.0 Heat Spark</div>
+        <div className="nav-sidebar-version">v{versionNumber} {versionName}</div>
       </div>
     </nav>
   )

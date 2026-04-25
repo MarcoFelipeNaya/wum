@@ -91,7 +91,7 @@ export default function Data({
 
     try {
       setIsLoadingDemo(true)
-      const response = await fetch('/demo-universe.json', { cache: 'no-store' })
+      const response = await fetch(`/demo-universe.json?starter=${Date.now()}`, { cache: 'reload' })
       if (!response.ok) throw new Error('Could not load demo universe')
       const text = await response.text()
       await importData(text)
@@ -164,10 +164,10 @@ export default function Data({
 
             <div className="data-action-card" style={{ background: 'linear-gradient(135deg, var(--bg3), #1a1a1a)', borderColor: 'var(--primary-dim)' }}>
               <FiGlobe style={{ fontSize: 24, color: 'var(--gold)' }} />
-              <div className="data-action-title">Demo Universe</div>
-              <div className="data-action-copy">Inject a curated fiction universe to explore Heat features instantly.</div>
+              <div className="data-action-title">Starter Universe</div>
+              <div className="data-action-copy">Load a curated demo with shows, titles, events, stories, teams, and HeatSpark relationships.</div>
               <button className="btn btn-secondary" onClick={handleLoadDemo} disabled={isLoadingDemo}>
-                {isLoadingDemo ? 'Loading Demo...' : 'Load Sample'}
+                {isLoadingDemo ? 'Loading Universe...' : 'Load Starter Universe'}
               </button>
             </div>
           </div>
@@ -218,12 +218,12 @@ export default function Data({
 
           <div className="data-reset-grid">
             {RESET_ACTIONS.map((action) => (
-              <div key={action.key} className="data-action-card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 800, fontSize: 13 }}>{action.label}</span>
-                  <span style={{ color: 'var(--text3)', fontSize: 11 }}>{summary[action.countKey]} Total</span>
+              <div key={action.key} className="data-reset-card">
+                <div className="data-reset-card-header">
+                  <span>{action.label}</span>
+                  <strong>{summary[action.countKey]} Total</strong>
                 </div>
-                <div className="data-action-copy" style={{ fontSize: 12 }}>{action.description}</div>
+                <div className="data-reset-copy">{action.description}</div>
                 <button className="btn btn-danger btn-sm" onClick={() => { if(confirm(`Purge ${action.label}?`)) clearDataScope(action.key); }}>
                   Purge Data
                 </button>

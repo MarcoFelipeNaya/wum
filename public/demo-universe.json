@@ -30,7 +30,13 @@
       { "id": 24, "name": "Bram Hex", "show": "Riot Hour", "align": "Heel", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 10, "losses": 14, "draws": 0, "streak": -2 },
       { "id": 25, "name": "Marrow Vale", "show": "Inferno", "align": "Heel", "gender": "Male", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 },
       { "id": 26, "name": "Celine Prism", "show": "Riot Hour", "align": "Face", "gender": "Female", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 },
-      { "id": 27, "name": "Archer Grey", "show": "Skyline", "align": "Neutral", "gender": "Male", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 }
+      { "id": 27, "name": "Archer Grey", "show": "Skyline", "align": "Neutral", "gender": "Male", "status": "Active", "role": "manager", "wins": 0, "losses": 0, "draws": 0, "streak": 0 },
+      { "id": 28, "name": "Rowan Flint", "show": "Inferno", "align": "Face", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 8, "losses": 5, "draws": 0, "streak": 2 },
+      { "id": 29, "name": "Nyx Marlow", "show": "Inferno", "align": "Heel", "gender": "Female", "status": "Active", "role": "wrestler", "wins": 7, "losses": 6, "draws": 0, "streak": -1 },
+      { "id": 30, "name": "Milo Jet", "show": "Skyline", "align": "Face", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 9, "losses": 4, "draws": 0, "streak": 3 },
+      { "id": 31, "name": "Serena Slate", "show": "Skyline", "align": "Heel", "gender": "Female", "status": "Active", "role": "wrestler", "wins": 6, "losses": 8, "draws": 0, "streak": -2 },
+      { "id": 32, "name": "Juno Ray", "show": "Riot Hour", "align": "Face", "gender": "Female", "status": "Active", "role": "wrestler", "wins": 10, "losses": 6, "draws": 0, "streak": 1 },
+      { "id": 33, "name": "Cal Grim", "show": "Riot Hour", "align": "Heel", "gender": "Male", "status": "Active", "role": "wrestler", "wins": 8, "losses": 9, "draws": 0, "streak": -1 }
     ],
     "shows": [
       { "id": 101, "name": "Inferno", "color": "#ff5a36", "day": "Monday" },
@@ -143,10 +149,28 @@
       { "id": 210, "name": "Voltage Bloom", "show": "Riot Hour", "type": "trio", "memberIds": [19, 21, 23], "factionId": 304 },
       { "id": 211, "name": "Glass Halo", "show": "Skyline", "type": "trio", "memberIds": [14, 16, 17], "factionId": 305 }
     ],
+    "relationships": [
+      { "id": 801, "wrestlerIds": [1, 2], "type": "Ally", "intensity": 4, "note": "Emberline are tag champions, but Ash Calder's singles ambition keeps testing Nova Vale's patience." },
+      { "id": 802, "wrestlerIds": [1, 3], "type": "Rival", "intensity": 5, "note": "Ash Calder still wants the Inferno Crown back from Rook Hollow." },
+      { "id": 803, "wrestlerIds": [10, 19], "type": "Respect", "intensity": 4, "note": "Orion Rush and Talia Prism finished the Ascension Cup build with a tense handshake and unfinished competitive curiosity." },
+      { "id": 804, "wrestlerIds": [12, 13], "type": "Former Partner", "intensity": 4, "note": "Night Array split after Cass Vane blamed Jett Striker for losing the Twin Crown." },
+      { "id": 805, "wrestlerIds": [23, 19], "type": "Betrayed", "intensity": 5, "note": "Zara Voltage cost Talia Prism a clean title celebration and insists it was strategy, not betrayal." },
+      { "id": 806, "wrestlerIds": [5, 20], "type": "Unfinished Business", "intensity": 4, "note": "Flint Mercer and Knox Torrent closed one fight, but neither accepts the final word." },
+      { "id": 807, "wrestlerIds": [14, 16], "type": "Mentor", "intensity": 3, "note": "Luma Frost has been teaching Piper Quill how to survive Skyline's faster pace." },
+      { "id": 808, "wrestlerIds": [30, 10], "type": "Student", "intensity": 3, "note": "Milo Jet studies Orion Rush's main-event habits and wants to prove the lessons are working." },
+      { "id": 809, "wrestlerIds": [22, 24], "type": "Owes Favor", "intensity": 4, "note": "Bram Hex helped Rune Mercer escape a post-match attack, and now Rune owes him at the worst possible time." },
+      { "id": 810, "wrestlerIds": [28, 29], "type": "Rival", "intensity": 3, "note": "Rowan Flint and Nyx Marlow arrived on Inferno arguing over who deserves the next breakthrough slot." },
+      { "id": 811, "wrestlerIds": [31, 11], "type": "Betrayed", "intensity": 4, "note": "Serena Slate turned a Skyline save into an ambush on Selene Riot." },
+      { "id": 812, "wrestlerIds": [32, 21], "type": "Ally", "intensity": 3, "note": "Juno Ray and Eden Pike have become a popular Riot Hour pairing with a little too much friendly competition." }
+    ],
     "specialShows": [
       { "id": 401, "showId": 101, "name": "Ashfall", "type": "annual", "month": 8, "day": 24, "startYear": 2026, "oneOffDate": null },
       { "id": 402, "showId": 102, "name": "Neon Summit", "type": "annual", "month": 8, "day": 20, "startYear": 2026, "oneOffDate": null },
-      { "id": 403, "showId": 103, "name": "Flashpoint", "type": "one_off", "month": 8, "day": 28, "startYear": 2026, "oneOffDate": "2026-08-28" }
+      { "id": 403, "showId": 103, "name": "Flashpoint", "type": "one_off", "month": 8, "day": 28, "startYear": 2026, "oneOffDate": "2026-08-28" },
+      { "id": 404, "showId": 101, "name": "Furnace Road", "type": "annual", "month": 9, "day": 21, "startYear": 2026, "oneOffDate": null },
+      { "id": 405, "showId": 102, "name": "Signal Clash", "type": "annual", "month": 9, "day": 16, "startYear": 2026, "oneOffDate": null },
+      { "id": 406, "showId": 103, "name": "Riot Reset", "type": "annual", "month": 9, "day": 25, "startYear": 2026, "oneOffDate": null },
+      { "id": 407, "showId": null, "name": "Heatwave Classic", "type": "one_off", "month": 10, "day": 11, "startYear": 2026, "oneOffDate": "2026-10-11" }
     ],
     "matches": [
       {

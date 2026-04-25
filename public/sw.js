@@ -1,4 +1,4 @@
-const CACHE_NAME = 'heat-shell-v4'
+const CACHE_NAME = 'heat-shell-v5'
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -35,6 +35,11 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url)
   if (requestUrl.origin !== self.location.origin) return
+
+  if (requestUrl.pathname === '/demo-universe.json') {
+    event.respondWith(fetch(event.request))
+    return
+  }
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
