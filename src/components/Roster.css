@@ -102,6 +102,19 @@
   margin-bottom: 4px;
 }
 
+.roster-table-footer {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  color: var(--text3);
+  display: flex;
+  font-size: 11px;
+  font-weight: 800;
+  justify-content: space-between;
+  letter-spacing: 0.5px;
+  padding: 14px 18px;
+  text-transform: uppercase;
+}
+
 /* CUSTOM BADGES */
 .badge-pro {
   font-size: 10px;
@@ -129,10 +142,141 @@
 .record-win { color: var(--green); font-weight: 800; }
 .record-loss { color: var(--red); font-weight: 800; }
 
+.relationships-card {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.relationships-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.relationships-header p {
+  color: var(--text3);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+
+.relationship-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.relationship-filters {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 12px;
+}
+
+.relationship-filter-footer,
+.relationship-table-footer {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  color: var(--text3);
+  display: flex;
+  font-size: 11px;
+  font-weight: 800;
+  justify-content: space-between;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+  padding-top: 12px;
+  text-transform: uppercase;
+}
+
+.relationship-table-footer {
+  margin: 16px 0 0;
+}
+
+.relationship-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.relationship-card-top,
+.relationship-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.relationship-type {
+  background: rgba(255, 90, 54, 0.14);
+  border: 1px solid rgba(255, 90, 54, 0.3);
+  border-radius: 999px;
+  color: var(--primary-light);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.relationship-intensity {
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.relationship-names {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 16px 0 8px;
+}
+
+.relationship-names span {
+  color: var(--text3);
+  font-family: var(--font-compact);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.relationship-note {
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.relationship-empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text3);
+  padding: 28px;
+  text-align: center;
+}
+
+.relationship-form {
+  min-width: 560px;
+}
+
 @media (max-width: 768px) {
   .roster-table-card {
     border-radius: 0;
     border-left: none;
     border-right: none;
+  }
+
+  .relationships-header {
+    flex-direction: column;
+  }
+
+  .relationship-form {
+    min-width: 0;
   }
 }

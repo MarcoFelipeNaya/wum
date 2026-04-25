@@ -4,10 +4,57 @@ import { FiSearch, FiUserPlus, FiFilter, FiEdit3, FiTrash2, FiAward, FiActivity,
 import { BsGenderAmbiguous } from "react-icons/bs";
 import './Roster.css'
 
-export default function Roster({ state, addWrestler, editWrestler, deleteWrestler, showToast }) {
-  const { wrestlers, shows, titles } = state
+const RELATIONSHIP_TYPES = [
+  'Ally',
+  'Rival',
+  'Former Partner',
+  'Mentor',
+  'Student',
+  'Family',
+  'Respect',
+  'Betrayed',
+  'Owes Favor',
+  'Unfinished Business',
+]
+
+function getRelationshipPhrase(type) {
+  if (type === 'Ally') return 'allied with'
+  if (type === 'Rival') return 'rival of'
+  if (type === 'Former Partner') return 'former partner of'
+  if (type === 'Mentor') return 'mentor of'
+  if (type === 'Student') return 'student of'
+  if (type === 'Family') return 'family with'
+  if (type === 'Respect') return 'respects'
+  if (type === 'Betrayed') return 'betrayed'
+  if (type === 'Owes Favor') return 'owes a favor to'
+  if (type === 'Unfinished Business') return 'has unfinished business with'
+  return 'connected to'
+}
+
+function getRelationshipKey(relationship) {
+  const directionalTypes = ['Mentor', 'Student', 'Betrayed', 'Owes Favor']
+  const ids = directionalTypes.includes(relationship?.type)
+    ? [...(relationship?.wrestlerIds || [])].join(':')
+    : [...(relationship?.wrestlerIds || [])].sort((a, b) => a - b).join(':')
+  return `${ids}:${relationship?.type || 'Rival'}`
+}
+
+export default function Roster({
+  state,
+  addWrestler,
+  editWrestler,
+  deleteWrestler,
+  addRelationship,
+  editRelationship,
+  deleteRelationship,
+  showToast,
+}) {
+  const { wrestlers, shows, titles, relationships = [] } = state
   const [modal, setModal] = useState(null)
   const [modalRole, setModalRole] = useState('wrestler')
+  const [relationshipModal, setRelationshipModal] = useState(null)
+  const [showAllRoster, setShowAllRoster] = useState(false)
+  const [showAllRelationships, setShowAllRelationships] = useState(false)
   const [filters, setFilters] = useState({
     search: '',
     show: 'all',
@@ -15,8 +62,15 @@ export default function Roster({ state, addWrestler, editWrestler, deleteWrestle
     gender: 'all',
     status: 'all',
   })
+  const [relationshipFilters, setRelationshipFilters] = useState({
+    wrestler: 'all',
+    type: 'all',
+    intensity: 'all',
+    search: '',
+  })
 
   const getShow = (name) => shows.find((s) => s.name === name)
+  const getWrestler = (id) => wrestlers.find((wrestler) => wrestler.id === id)
   const getChampIds = (title) => (Array.isArray(title.champIds) && title.champIds.length > 0 ? title.champIds : (title.champId ? [title.champId] : []))
   const getBrandColor = (showName) => getShow(showName)?.color || 'var(--primary)'
   
@@ -43,6 +97,25 @@ export default function Roster({ state, addWrestler, editWrestler, deleteWrestle
       })
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [filters, wrestlers])
+  const visibleWrestlers = showAllRoster ? filteredWrestlers : filteredWrestlers.slice(0, 10)
+  const filteredRelationships = useMemo(() => {
+    const search = relationshipFilters.search.trim().toLowerCase()
+    return relationships
+      .filter((relationship) => {
+        const wrestlerIds = relationship.wrestlerIds || []
+        if (relationshipFilters.wrestler !== 'all' && !wrestlerIds.includes(parseInt(relationshipFilters.wrestler, 10))) return false
+        if (relationshipFilters.type !== 'all' && relationship.type !== relationshipFilters.type) return false
+        if (relationshipFilters.intensity !== 'all' && String(relationship.intensity) !== relationshipFilters.intensity) return false
+        if (search) {
+          const names = wrestlerIds.map((id) => getWrestler(id)?.name || '').join(' ').toLowerCase()
+          const haystack = `${names} ${relationship.type || ''} ${relationship.note || ''}`.toLowerCase()
+          if (!haystack.includes(search)) return false
+        }
+        return true
+      })
+      .sort((a, b) => (b.intensity || 0) - (a.intensity || 0))
+  }, [relationships, relationshipFilters, wrestlers])
+  const visibleRelationships = showAllRelationships ? filteredRelationships : filteredRelationships.slice(0, 10)
 
   const handleSave = (e) => {
     e.preventDefault()
@@ -79,7 +152,52 @@ export default function Roster({ state, addWrestler, editWrestler, deleteWrestle
 
   const getAlignClass = (a) => (a === 'Face' ? 'badge-face' : a === 'Heel' ? 'badge-heel' : 'badge-neutral')
   const updateFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }))
-  const resetFilters = () => setFilters({ search: '', show: 'all', align: 'all', gender: 'all', status: 'all' })
+  const updateRelationshipFilter = (key, value) => {
+    setRelationshipFilters((prev) => ({ ...prev, [key]: value }))
+    setShowAllRelationships(false)
+  }
+  const resetFilters = () => {
+    setFilters({ search: '', show: 'all', align: 'all', gender: 'all', status: 'all' })
+    setShowAllRoster(false)
+  }
+  const resetRelationshipFilters = () => {
+    setRelationshipFilters({ wrestler: 'all', type: 'all', intensity: 'all', search: '' })
+    setShowAllRelationships(false)
+  }
+
+  const handleSaveRelationship = (e) => {
+    e.preventDefault()
+    const fd = new FormData(e.target)
+    const wrestlerIds = [parseInt(fd.get('wrestlerA'), 10), parseInt(fd.get('wrestlerB'), 10)].filter(Boolean)
+    const data = {
+      wrestlerIds,
+      type: fd.get('type'),
+      intensity: parseInt(fd.get('intensity'), 10) || 3,
+      note: fd.get('note')?.trim() || '',
+    }
+
+    if (wrestlerIds.length !== 2 || wrestlerIds[0] === wrestlerIds[1]) {
+      showToast('Choose two different wrestlers')
+      return
+    }
+    const duplicate = relationships.some((relationship) => {
+      if (relationshipModal?.id && relationship.id === relationshipModal.id) return false
+      return getRelationshipKey(relationship) === getRelationshipKey(data)
+    })
+    if (duplicate) {
+      showToast('That relationship already exists')
+      return
+    }
+
+    if (relationshipModal?.id) {
+      editRelationship(relationshipModal.id, data)
+      showToast('Relationship updated')
+    } else {
+      addRelationship(data)
+      showToast('Relationship added')
+    }
+    setRelationshipModal(null)
+  }
 
   return (
     <div className="roster-page">
@@ -166,7 +284,7 @@ export default function Roster({ state, addWrestler, editWrestler, deleteWrestle
                   </td>
                 </tr>
               )}
-              {filteredWrestlers.map((w) => {
+              {visibleWrestlers.map((w) => {
                 const sh = getShow(w.show)
                 const champs = titles.filter((t) => getChampIds(t).includes(w.id))
                 const initials = w.name.split(' ').map(n => n[0]).join('').slice(0, 2)
@@ -250,7 +368,108 @@ export default function Roster({ state, addWrestler, editWrestler, deleteWrestle
             </tbody>
           </table>
         </div>
+        {filteredWrestlers.length > 10 && (
+          <div className="roster-table-footer">
+            <span>
+              Showing {visibleWrestlers.length} of {filteredWrestlers.length} talent{filteredWrestlers.length !== 1 ? 's' : ''}
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowAllRoster((value) => !value)}>
+              {showAllRoster ? 'Show Less' : 'Show More'}
+            </button>
+          </div>
+        )}
       </div>
+
+      <section className="relationships-card">
+        <div className="relationships-header">
+          <div>
+            <h2 className="section-title">Relationships</h2>
+            <p>Track rivalries, allies, former partners, and unfinished business for future HeatSpark ideas.</p>
+          </div>
+          <button className="btn btn-primary" type="button" onClick={() => setRelationshipModal('add')}>
+            Add Relationship
+          </button>
+        </div>
+
+        <div className="relationship-filters">
+          <div className="form-group">
+            <label><FiSearch /> Search</label>
+            <input value={relationshipFilters.search} onChange={(e) => updateRelationshipFilter('search', e.target.value)} placeholder="Name, note, type..." />
+          </div>
+          <div className="form-group">
+            <label>Wrestler</label>
+            <select value={relationshipFilters.wrestler} onChange={(e) => updateRelationshipFilter('wrestler', e.target.value)}>
+              <option value="all">All Wrestlers</option>
+              {wrestlers
+                .filter((wrestler) => (wrestler.role || 'wrestler') === 'wrestler')
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((wrestler) => <option key={wrestler.id} value={wrestler.id}>{wrestler.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Type</label>
+            <select value={relationshipFilters.type} onChange={(e) => updateRelationshipFilter('type', e.target.value)}>
+              <option value="all">All Types</option>
+              {RELATIONSHIP_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Intensity</label>
+            <select value={relationshipFilters.intensity} onChange={(e) => updateRelationshipFilter('intensity', e.target.value)}>
+              <option value="all">All Intensities</option>
+              {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}/5</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="relationship-filter-footer">
+          <span>{filteredRelationships.length} relationship{filteredRelationships.length !== 1 ? 's' : ''} shown</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={resetRelationshipFilters}>Reset Filters</button>
+        </div>
+
+        {relationships.length === 0 ? (
+          <div className="relationship-empty">No relationships yet. Add a connection to give the universe more memory.</div>
+        ) : filteredRelationships.length === 0 ? (
+          <div className="relationship-empty">No relationships match your filters.</div>
+        ) : (
+          <div className="relationship-grid">
+            {visibleRelationships.map((relationship) => {
+              const [firstId, secondId] = relationship.wrestlerIds || []
+              const first = getWrestler(firstId)
+              const second = getWrestler(secondId)
+              return (
+                <div key={relationship.id} className="relationship-card">
+                  <div className="relationship-card-top">
+                    <span className="relationship-type">{relationship.type}</span>
+                    <span className="relationship-intensity">Intensity {relationship.intensity}/5</span>
+                  </div>
+                  <div className="relationship-names">
+                    {first?.name || 'Unknown'} <span>{getRelationshipPhrase(relationship.type)}</span> {second?.name || 'Unknown'}
+                  </div>
+                  {relationship.note && <div className="relationship-note">{relationship.note}</div>}
+                  <div className="relationship-actions">
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={() => setRelationshipModal({ id: relationship.id })}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger btn-sm" type="button" onClick={() => { deleteRelationship(relationship.id); showToast('Relationship removed') }}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {filteredRelationships.length > 10 && (
+          <div className="relationship-table-footer">
+            <span>
+              Showing {visibleRelationships.length} of {filteredRelationships.length} relationship{filteredRelationships.length !== 1 ? 's' : ''}
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowAllRelationships((value) => !value)}>
+              {showAllRelationships ? 'Show Less' : 'Show More'}
+            </button>
+          </div>
+        )}
+      </section>
 
       {modal && (
         <Modal 
@@ -336,6 +555,77 @@ export default function Roster({ state, addWrestler, editWrestler, deleteWrestle
               )
             })()}
           </form>
+        </Modal>
+      )}
+
+      {relationshipModal && (
+        <Modal
+          title={relationshipModal === 'add' ? 'Add Relationship' : 'Edit Relationship'}
+          onClose={() => setRelationshipModal(null)}
+        >
+          {(() => {
+            const relationship = relationshipModal !== 'add'
+              ? relationships.find((item) => item.id === relationshipModal.id)
+              : null
+            const competitiveWrestlers = wrestlers.filter((wrestler) => (wrestler.role || 'wrestler') === 'wrestler')
+            const firstDefault = relationship?.wrestlerIds?.[0] || competitiveWrestlers[0]?.id || ''
+            const secondDefault = relationship?.wrestlerIds?.[1] || competitiveWrestlers.find((wrestler) => wrestler.id !== firstDefault)?.id || ''
+
+            return (
+              <form onSubmit={handleSaveRelationship}>
+                <div className="relationship-form">
+                  <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-group">
+                      <label>Wrestler A</label>
+                      <select name="wrestlerA" defaultValue={firstDefault}>
+                        {competitiveWrestlers.map((wrestler) => (
+                          <option key={wrestler.id} value={wrestler.id}>{wrestler.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Wrestler B</label>
+                      <select name="wrestlerB" defaultValue={secondDefault}>
+                        {competitiveWrestlers.map((wrestler) => (
+                          <option key={wrestler.id} value={wrestler.id}>{wrestler.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 16 }}>
+                    <div className="form-group">
+                      <label>Relationship Type</label>
+                      <select name="type" defaultValue={relationship?.type || 'Rival'}>
+                        {RELATIONSHIP_TYPES.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Intensity</label>
+                      <select name="intensity" defaultValue={relationship?.intensity || 3}>
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <option key={value} value={value}>{value}/5</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Note</label>
+                    <textarea name="note" rows={3} defaultValue={relationship?.note || ''} placeholder="What history do they share?" />
+                  </div>
+                  <div className="form-actions" style={{ marginTop: 24 }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setRelationshipModal(null)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      {relationship ? 'Save Relationship' : 'Add Relationship'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )
+          })()}
         </Modal>
       )}
     </div>

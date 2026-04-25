@@ -1,0 +1,563 @@
+.creative-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: fadeIn 0.45s ease-out;
+}
+
+/* ─── HEADER ─────────────────────────────────────────── */
+.creative-header {
+  align-items: flex-end;
+  background: linear-gradient(135deg, var(--bg2), var(--bg3));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  display: flex;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 36px;
+  position: relative;
+}
+
+.creative-header::after {
+  background: radial-gradient(circle, rgba(255, 90, 54, 0.18), transparent 70%);
+  content: '';
+  height: 420px;
+  position: absolute;
+  right: -120px;
+  top: -170px;
+  width: 420px;
+}
+
+.creative-kicker {
+  color: var(--primary-light);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.creative-subtitle {
+  color: var(--text2);
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 680px;
+}
+
+/* ─── MAIN GRID ───────────────────────────────────────── */
+/*
+  Layout intent:
+    Col 1 (wider): Match Generator — tall, spans rows 1–2
+    Col 2 (narrower): Segment Generator (row 1), Assistant Cues (row 2)
+    Row 3: Story Generator — full width
+*/
+.creative-grid {
+  display: grid;
+  gap: 24px;
+  /* Left col slightly wider than right */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  /* Three explicit row tracks so items land predictably */
+  grid-template-rows: auto auto auto;
+}
+
+/* Match Generator: col 1, rows 1–2 */
+.creative-panel-match {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+
+/* Segment Generator: col 2, row 1 */
+.creative-panel-segment {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/* Assistant Cues: col 2, row 2 */
+.creative-panel-cues {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* Story Generator: full width, row 3 */
+.creative-story-panel {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+/* ─── PANEL BASE ──────────────────────────────────────── */
+.creative-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px;
+}
+
+.creative-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.creative-panel-header h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 1px;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.creative-panel-header p {
+  color: var(--text3);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─── CONTROLS ────────────────────────────────────────── */
+.creative-controls {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.creative-controls-stack {
+  grid-template-columns: 1fr;
+}
+
+.creative-controls label {
+  color: var(--text3);
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.creative-controls select {
+  appearance: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ff9a2f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") calc(100% - 13px) 50% / 14px 14px no-repeat,
+    var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-compact);
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 44px;
+  outline: none;
+  padding: 0 36px 0 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  width: 100%;
+}
+
+.creative-controls select:hover {
+  border-color: var(--border2);
+  background-color: var(--bg4);
+}
+
+.creative-controls select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.16);
+}
+
+.creative-controls select option {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+.creative-check {
+  align-items: center;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text2) !important;
+  flex-direction: row !important;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.creative-check input {
+  accent-color: var(--primary);
+}
+
+/* ─── SUGGESTION CARD (Match) ─────────────────────────── */
+/*
+  Stack icon + text vertically, put the button at the bottom.
+  This avoids the cramped 3-col row where the button was squeezed.
+*/
+.creative-suggestion-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.creative-suggestion-card-top {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.creative-suggestion-icon {
+  align-items: center;
+  background: rgba(255, 90, 54, 0.16);
+  border: 1px solid rgba(255, 90, 54, 0.3);
+  border-radius: var(--radius);
+  color: var(--primary-light);
+  display: flex;
+  flex-shrink: 0;
+  font-size: 24px;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.creative-suggestion-label {
+  color: var(--primary-light);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.creative-suggestion-card h3,
+.creative-segment-card h3 {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+
+.creative-suggestion-card p,
+.creative-segment-card p {
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* Button sits at bottom, aligned left, full-width on small panels */
+.creative-suggestion-card .btn,
+.creative-segment-card .btn {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* ─── CHIP ROW ────────────────────────────────────────── */
+.creative-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.creative-chip-row span {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 6px 9px;
+  text-transform: uppercase;
+}
+
+/* ─── SEGMENT CARD ────────────────────────────────────── */
+.creative-segment-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  flex: 1; /* fills remaining vertical space in the panel */
+}
+
+.creative-list-subtle {
+  color: var(--text3);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* ─── CUE LIST ────────────────────────────────────────── */
+.creative-cue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.creative-cue {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+}
+
+.creative-cue strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.creative-cue span {
+  color: var(--text3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ─── STORY CARD ──────────────────────────────────────── */
+/*
+  Old layout: 3 CSS grid columns with a minmax(360px, …) middle column
+  that broke at medium viewports. New layout: flex row with defined
+  widths so the button always has room.
+*/
+.creative-story-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: row;
+  gap: 28px;
+  padding: 24px;
+  align-items: flex-start;
+}
+
+.creative-story-main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.creative-story-main h3 {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.15;
+  margin: 0 0 10px;
+}
+
+.creative-story-main p {
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.creative-story-outline {
+  flex: 0 0 320px;          /* fixed width column, collapses on mobile */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.creative-story-outline div {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 10px;
+}
+
+.creative-story-outline div:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.creative-story-outline span {
+  color: var(--primary-light);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.creative-story-outline strong {
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* Create Story button — never crushed, always on its own column */
+.creative-story-card > .btn {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* ─── EMPTY / MISC ────────────────────────────────────── */
+.creative-empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text3);
+  padding: 32px;
+  text-align: center;
+}
+
+/* ─── BOOKING MODAL INTERNALS ─────────────────────────── */
+.creative-booking-summary {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 16px;
+}
+
+.creative-booking-summary strong {
+  color: var(--text);
+}
+
+.creative-booking-summary span {
+  color: var(--text3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.creative-edit-block {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 18px;
+}
+
+.creative-edit-grid,
+.creative-schedule-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.creative-edit-block label {
+  color: var(--text3);
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.creative-edit-block input,
+.creative-edit-block select,
+.creative-edit-block textarea,
+.creative-schedule-grid select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-compact);
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+  padding: 11px 12px;
+  text-transform: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+}
+
+.creative-edit-block select,
+.creative-schedule-grid select {
+  appearance: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ff9a2f' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") calc(100% - 13px) 50% / 14px 14px no-repeat,
+    var(--bg3);
+  padding-right: 36px;
+}
+
+.creative-edit-block textarea {
+  line-height: 1.5;
+  min-height: 110px;
+  resize: vertical;
+  text-transform: none;
+}
+
+.creative-edit-block input:focus,
+.creative-edit-block select:focus,
+.creative-edit-block textarea:focus,
+.creative-schedule-grid select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.16);
+}
+
+.creative-edit-block option,
+.creative-schedule-grid option {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────── */
+
+/* Medium — single col, drop explicit row/col placements */
+@media (max-width: 1024px) {
+  .creative-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .creative-panel-match,
+  .creative-panel-segment,
+  .creative-panel-cues,
+  .creative-story-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .creative-controls {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}
+
+/* Story card switches to column on small screens */
+@media (max-width: 860px) {
+  .creative-story-card {
+    flex-direction: column;
+  }
+
+  .creative-story-outline {
+    flex: none;
+    width: 100%;
+  }
+
+  .creative-story-card > .btn {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .creative-header,
+  .creative-panel {
+    padding: 22px;
+  }
+
+  .creative-panel-header {
+    flex-direction: column;
+  }
+
+  .creative-edit-grid,
+  .creative-schedule-grid {
+    grid-template-columns: 1fr;
+  }
+}

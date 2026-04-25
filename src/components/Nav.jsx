@@ -9,6 +9,7 @@ import {
   FiLayout,
   FiTv,
   FiUsers,
+  FiZap,
 } from 'react-icons/fi'
 import { HiOutlineUserGroup } from 'react-icons/hi'
 import { TbTournament } from 'react-icons/tb'
@@ -25,6 +26,7 @@ const PAGES = [
   { id: 'tournaments', label: 'Tournaments', icon: TbTournament },
   { id: 'titles', label: 'Titles', icon: FiAward },
   { id: 'stories', label: 'Stories', icon: FiBookOpen },
+  { id: 'creative', label: 'HeatSpark', icon: FiZap },
   { id: 'data', label: 'Data', icon: FiDatabase },
 ]
 
@@ -59,7 +61,7 @@ export default function Nav({ current, onNavigate }) {
       </div>
 
       <div className="nav-sidebar-footer">
-        <div className="nav-sidebar-version">v1.1.2 Opening Bell</div>
+        <div className="nav-sidebar-version">v1.2.0 Heat Spark</div>
       </div>
     </nav>
   )

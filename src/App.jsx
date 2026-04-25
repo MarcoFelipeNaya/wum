@@ -9,6 +9,7 @@ import Records from './components/Records.jsx'
 import Calendar from './components/Calendar.jsx'
 import Titles from './components/Titles.jsx'
 import Stories from './components/Stories.jsx'
+import Creative from './components/Creative.jsx'
 import Data from './components/Data.jsx'
 import Tournaments from './components/Tournaments.jsx'
 import { useStore } from './store.js'
@@ -26,6 +27,7 @@ const PAGE_COMPONENTS = {
   tournaments: Tournaments,
   titles: Titles,
   stories: Stories,
+  creative: Creative,
   data: Data,
 }
 

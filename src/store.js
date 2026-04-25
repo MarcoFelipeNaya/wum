@@ -73,6 +73,44 @@ function normalizeRosterRole(role) {
   return role === 'manager' ? 'manager' : 'wrestler'
 }
 
+function normalizeRelationshipType(type) {
+  const allowed = [
+    'Ally',
+    'Rival',
+    'Former Partner',
+    'Mentor',
+    'Student',
+    'Family',
+    'Respect',
+    'Betrayed',
+    'Owes Favor',
+    'Unfinished Business',
+  ]
+  return allowed.includes(type) ? type : 'Rival'
+}
+
+function normalizeRelationship(relationship, index = 0) {
+  const wrestlerIds = Array.isArray(relationship?.wrestlerIds)
+    ? [...new Set(relationship.wrestlerIds.map((id) => parseInt(id, 10)).filter(Boolean))].slice(0, 2)
+    : []
+
+  return {
+    id: parseInt(relationship?.id, 10) || `relationship-${index + 1}`,
+    wrestlerIds,
+    type: normalizeRelationshipType(relationship?.type),
+    intensity: Math.min(5, Math.max(1, parseInt(relationship?.intensity, 10) || 3)),
+    note: String(relationship?.note || '').trim().slice(0, 500),
+  }
+}
+
+function getRelationshipKey(relationship) {
+  const directionalTypes = ['Mentor', 'Student', 'Betrayed', 'Owes Favor']
+  const ids = directionalTypes.includes(relationship?.type)
+    ? [...(relationship?.wrestlerIds || [])].join(':')
+    : [...(relationship?.wrestlerIds || [])].sort((a, b) => a - b).join(':')
+  return `${ids}:${relationship?.type || 'Rival'}`
+}
+
 function isCompetitiveRole(person) {
   return normalizeRosterRole(person?.role) === 'wrestler'
 }
@@ -459,6 +497,7 @@ const INITIAL_STATE = {
   ],
   factions: [],
   teams: [],
+  relationships: [],
   specialShows: [],
   matches: [],
   stories: [],
@@ -495,6 +534,12 @@ function normalizeStoredState(rawState) {
   parsed.titles = parsed.titles || INITIAL_STATE.titles
   parsed.factions = parsed.factions || []
   parsed.teams = parsed.teams || []
+  parsed.relationships = (parsed.relationships || [])
+    .map((relationship, index) => normalizeRelationship(relationship, index))
+    .filter((relationship) => {
+      if (relationship.wrestlerIds.length !== 2) return false
+      return relationship.wrestlerIds.every((id) => parsed.wrestlers.some((wrestler) => wrestler.id === id))
+    })
   parsed.specialShows = (parsed.specialShows || []).map((specialShow) => normalizeSpecialShow(specialShow))
   parsed.matches = parsed.matches || []
   parsed.stories = parsed.stories || []
@@ -601,6 +646,7 @@ function buildAutosaveSummary(state, label = 'Autosave') {
       tournaments: state.tournaments?.length || 0,
       teams: state.teams?.length || 0,
       factions: state.factions?.length || 0,
+      relationships: state.relationships?.length || 0,
       stories: state.stories?.length || 0,
       matches: state.matches?.length || 0,
     },
@@ -818,6 +864,7 @@ export function useStore() {
         champSince: nextChampIds.length > 0 ? t.champSince : null,
       }
     })
+    s.relationships = (s.relationships || []).filter((relationship) => !(relationship.wrestlerIds || []).includes(id))
     return s
   })
 
@@ -1304,6 +1351,29 @@ export function useStore() {
     return s
   })
 
+  const addRelationship = (data) => update((s) => {
+    const normalized = normalizeRelationship({ id: genId(s), ...data })
+    if (normalized.wrestlerIds.length !== 2 || normalized.wrestlerIds[0] === normalized.wrestlerIds[1]) return s
+    if ((s.relationships || []).some((relationship) => getRelationshipKey(relationship) === getRelationshipKey(normalized))) return s
+    s.relationships = [...(s.relationships || []), normalized]
+    return s
+  })
+
+  const editRelationship = (id, data) => update((s) => {
+    const normalized = normalizeRelationship({ id, ...data })
+    if (normalized.wrestlerIds.length !== 2 || normalized.wrestlerIds[0] === normalized.wrestlerIds[1]) return s
+    if ((s.relationships || []).some((relationship) => relationship.id !== id && getRelationshipKey(relationship) === getRelationshipKey(normalized))) return s
+    s.relationships = (s.relationships || []).map((relationship) => (
+      relationship.id === id ? normalized : relationship
+    ))
+    return s
+  })
+
+  const deleteRelationship = (id) => update((s) => {
+    s.relationships = (s.relationships || []).filter((relationship) => relationship.id !== id)
+    return s
+  })
+
   const addSpecialShow = (data) => update((s) => {
     const normalized = normalizeSpecialShow({ id: genId(s), ...data })
     s.specialShows = [...s.specialShows, normalized]
@@ -1587,6 +1657,7 @@ export function useStore() {
         next.currentDate = normalizeCurrentDate(todayStr(), next.shows, next.specialShows)
       } else if (scope === 'roster') {
         next.wrestlers = []
+        next.relationships = []
         next.matches = []
         next.stories = []
         next.standaloneSegments = []
@@ -1610,6 +1681,7 @@ export function useStore() {
           titles: [],
           factions: [],
           teams: [],
+          relationships: [],
           specialShows: [],
           matches: [],
           stories: [],
@@ -1663,6 +1735,9 @@ export function useStore() {
     addTeam,
     editTeam,
     deleteTeam,
+    addRelationship,
+    editRelationship,
+    deleteRelationship,
     addSpecialShow,
     editSpecialShow,
     deleteSpecialShow,

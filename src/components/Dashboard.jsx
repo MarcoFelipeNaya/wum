@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { DAY_NAMES, getCustomDow, parseDate, formatUniverseDate } from '../utils/dates.js'
+import { DAY_NAMES, getCustomDow, parseDate, formatUniverseDate, daysBetween } from '../utils/dates.js'
 import { buildRankings, buildWeeklyPRSChanges } from '../utils/rankings.js'
 import { getMatchRatingSummary } from '../utils/matchRatings.js'
 import './Dashboard.css'
@@ -54,6 +54,46 @@ function segmentTypeBadgeColor(segmentType) {
   if (t.includes('gm') || t.includes('contract') || t.includes('ceremony')) return '#d4af37'
   if (t.includes('celebration') || t.includes('retirement') || t.includes('return')) return '#27ae60'
   return 'var(--text2)'
+}
+
+function DashboardPanel({ title, count, filters = null, empty = false, emptyText = '', children, className = '' }) {
+  return (
+    <div className={`dashboard-panel${className ? ` ${className}` : ''}`}>
+      <div className="dashboard-panel-header">
+        <div className="dashboard-panel-heading">{title}</div>
+        {count && <div className="dashboard-panel-count">{count}</div>}
+      </div>
+      {filters}
+      {empty ? <div className="dashboard-empty-state">{emptyText}</div> : children}
+    </div>
+  )
+}
+
+function FilterTabs({ options, value, onChange }) {
+  return (
+    <div className="dashboard-filter-row">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className={`dashboard-filter-btn${value === option.value ? ' active' : ''}`}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function StatCard({ label, value, tone }) {
+  return (
+    <div className="dashboard-stat-card">
+      <div className="dashboard-stat-accent" style={{ background: `linear-gradient(90deg, ${tone}, transparent)` }} />
+      <div className="dashboard-stat-value">{value}</div>
+      <div className="dashboard-stat-label">{label}</div>
+    </div>
+  )
 }
 
 export default function Dashboard({ state }) {
@@ -115,6 +155,21 @@ export default function Dashboard({ state }) {
     [matches]
   )
   const availableShowFilters = useMemo(() => shows.map((show) => show.name), [shows])
+  const titleFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All' },
+      { value: 'Universe', label: 'Universe' },
+      ...availableShowFilters.map((showName) => ({ value: showName, label: showName })),
+    ],
+    [availableShowFilters]
+  )
+  const showFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All' },
+      ...availableShowFilters.map((showName) => ({ value: showName, label: showName })),
+    ],
+    [availableShowFilters]
+  )
 
   const tonightCard = useMemo(() => {
     const dayMatches = matches
@@ -180,6 +235,158 @@ export default function Dashboard({ state }) {
     [wrestlers, matches, currentDate]
   )
 
+  const heatCheck = useMemo(() => {
+    const currentRankings = buildRankings(wrestlers, matches, titles)
+    const rankMap = new Map(currentRankings.map((row) => [row.id, row]))
+    const storyParticipantMap = new Map()
+
+    activeStories.forEach((story) => {
+      getStoryParticipantIds(story).forEach((id) => {
+        storyParticipantMap.set(id, (storyParticipantMap.get(id) || 0) + 1)
+      })
+    })
+
+    const segmentActivityMap = new Map()
+    stories.forEach((story) => {
+      ;(story.segments || []).forEach((segment) => {
+        ;(segment.wrestlerIds || getStoryParticipantIds(story)).forEach((id) => {
+          segmentActivityMap.set(id, (segmentActivityMap.get(id) || 0) + 1)
+        })
+      })
+    })
+    standaloneSegments.forEach((segment) => {
+      ;(segment.wrestlerIds || []).forEach((id) => {
+        segmentActivityMap.set(id, (segmentActivityMap.get(id) || 0) + 1)
+      })
+    })
+
+    const snapshots = competitiveRoster.map((wrestler) => {
+      const wrestlerMatches = completedMatches
+        .filter((match) => getParticipantIds(match).includes(wrestler.id))
+        .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || ((Number(a.id) || 0) - (Number(b.id) || 0)))
+      const recentMatches = wrestlerMatches.slice(-5)
+      const recentWindowMatches = wrestlerMatches.filter((match) => {
+        const age = daysBetween(match.date, currentDate)
+        return age >= 0 && age <= 28
+      })
+      const recentWins = recentMatches.filter((match) => match.winnerId === wrestler.id).length
+      const recentLosses = recentMatches.filter((match) => match.winnerId && match.winnerId !== wrestler.id).length
+      const ratings = recentMatches.map((match) => Number(match.rating)).filter((rating) => Number.isFinite(rating))
+      const averageRating = ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0
+      const titleCount = titles.filter((title) => getChampIds(title).includes(wrestler.id)).length
+      const storyCount = storyParticipantMap.get(wrestler.id) || 0
+      const segmentCount = segmentActivityMap.get(wrestler.id) || 0
+      const ranking = rankMap.get(wrestler.id)
+      const lastMatch = wrestlerMatches[wrestlerMatches.length - 1]
+      const daysIdle = lastMatch ? daysBetween(lastMatch.date, currentDate) : null
+      const score = Math.round(
+        (recentWins * 16)
+        - (recentLosses * 7)
+        + ((wrestler.streak || 0) * 5)
+        + (titleCount * 12)
+        + (storyCount * 7)
+        + (segmentCount * 2)
+        + (averageRating * 4)
+        + (recentWindowMatches.length * 3)
+        + (ranking ? Math.max(0, 8 - ranking.rank) : 0)
+      )
+
+      let status = 'Steady'
+      if (score >= 55 || (recentWins >= 4 && (wrestler.streak || 0) >= 3)) status = 'On Fire'
+      else if (score >= 35 || recentWins >= 3) status = 'Rising'
+      else if ((wrestler.streak || 0) <= -2 || recentLosses >= 3) status = 'Cooling'
+      else if (daysIdle == null || daysIdle > 28) status = 'Underused'
+
+      return {
+        id: wrestler.id,
+        name: wrestler.name,
+        show: wrestler.show || 'Universe',
+        score,
+        status,
+        recentRecord: `${recentWins}-${recentLosses}`,
+        recentMatches: recentMatches.length,
+        titleCount,
+        storyCount,
+        daysIdle,
+        rank: ranking?.rank,
+      }
+    })
+
+    const topMomentum = [...snapshots]
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+      .slice(0, 4)
+    const attention = [...snapshots]
+      .filter((row) => row.status === 'Cooling' || row.status === 'Underused')
+      .sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'Cooling' ? -1 : 1
+        return (b.daysIdle || 0) - (a.daysIdle || 0)
+      })
+      .slice(0, 4)
+
+    return { topMomentum, attention }
+  }, [wrestlers, matches, titles, activeStories, stories, standaloneSegments, competitiveRoster, completedMatches, currentDate])
+
+  const universeNews = useMemo(() => {
+    const titleMap = new Map(titles.map((title) => [title.id, title]))
+    const items = []
+
+    completedMatches.forEach((match) => {
+      const title = titleMap.get(match.titleId)
+      const winner = getW(match.winnerId)
+      const label = renderMatchLabel(match)
+      if (title && winner) {
+        items.push({
+          id: `title-${match.id}`,
+          date: match.date,
+          type: 'Title Scene',
+          tone: '#d4af37',
+          headline: `${winner.name} leaves with ${title.name}`,
+          detail: `${label} ended with championship stakes settled.`,
+        })
+        return
+      }
+      if (winner) {
+        items.push({
+          id: `match-${match.id}`,
+          date: match.date,
+          type: 'Result',
+          tone: '#2980b9',
+          headline: `${winner.name} scores the win`,
+          detail: label,
+        })
+      }
+    })
+
+    stories.forEach((story) => {
+      ;(story.segments || []).forEach((segment, index) => {
+        items.push({
+          id: `story-${story.id}-${segment.id || index}`,
+          date: segment.date,
+          type: story.type === 'rivalry' ? 'Rivalry Beat' : 'Story Beat',
+          tone: segmentTypeBadgeColor(segment.segmentType),
+          headline: segment.title || story.name,
+          detail: `${story.name}${segment.segmentType ? ` - ${segment.segmentType}` : ''}`,
+        })
+      })
+    })
+
+    standaloneSegments.forEach((segment, index) => {
+      items.push({
+        id: `standalone-${segment.id || index}`,
+        date: segment.date,
+        type: 'Segment',
+        tone: segmentTypeBadgeColor(segment.segmentType),
+        headline: segment.title || 'Standalone segment',
+        detail: segment.segmentType || 'Angle added to the card',
+      })
+    })
+
+    return items
+      .filter((item) => item.date)
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)))
+      .slice(0, 8)
+  }, [completedMatches, titles, stories, standaloneSegments])
+
   const brandPulse = useMemo(
     () =>
       shows.map((show) => {
@@ -210,7 +417,7 @@ export default function Dashboard({ state }) {
     { label: 'Avg Match Rating', value: ratingSummary.averageRating != null ? `${ratingSummary.averageRating}/5` : '--', tone: '#f39c12' },
   ]
 
-  const renderMatchLabel = (match) => {
+  function renderMatchLabel(match) {
     const participantIds = getParticipantIds(match)
     const participantNames = participantIds.map((id) => getW(id)?.name || 'Unknown')
     if (match.mode === 'tag' || match.mode === 'trios' || match.mode === '3tag') {
@@ -330,12 +537,98 @@ export default function Dashboard({ state }) {
 
       <section className="dashboard-stat-grid">
         {stats.map((stat) => (
-          <div key={stat.label} className="dashboard-stat-card">
-            <div className="dashboard-stat-accent" style={{ background: `linear-gradient(90deg, ${stat.tone}, transparent)` }} />
-            <div className="dashboard-stat-value">{stat.value}</div>
-            <div className="dashboard-stat-label">{stat.label}</div>
-          </div>
+          <StatCard key={stat.label} {...stat} />
         ))}
+      </section>
+
+      <section className="dashboard-feature-grid">
+        <DashboardPanel
+          title="Heat Check"
+          count={`${heatCheck.topMomentum.length} momentum picks`}
+          empty={heatCheck.topMomentum.length === 0}
+          emptyText="Book completed matches to generate Heat Check momentum."
+          className="dashboard-panel-feature"
+        >
+          <div className="dashboard-formula-note">
+            Heat weighs recent wins and losses, streak, championships, active stories, segment activity, match ratings,
+            recent booking, and current ranking position.
+          </div>
+          <div className="dashboard-heat-layout">
+            <div className="dashboard-heat-column">
+              <div className="dashboard-mini-heading">On The Rise</div>
+              <div className="dashboard-list">
+                {heatCheck.topMomentum.map((row) => (
+                  <div key={row.id} className="dashboard-heat-card">
+                    <div className="dashboard-heat-score">
+                      <span>{Math.max(0, row.score)}</span>
+                      <small>Heat</small>
+                    </div>
+                    <div className="dashboard-list-main">
+                      <div className="dashboard-result-topline">
+                        <span className="dashboard-match-type">{row.status}</span>
+                        <span className="dashboard-result-date">{row.show}</span>
+                      </div>
+                      <div className="dashboard-result-title">{row.name}</div>
+                      <div className="dashboard-list-subtle">
+                        Recent {row.recentRecord}
+                        {row.rank ? ` - ranked #${row.rank}` : ''}
+                        {row.titleCount > 0 ? ` - ${row.titleCount} title${row.titleCount !== 1 ? 's' : ''}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="dashboard-heat-column">
+              <div className="dashboard-mini-heading">Needs Attention</div>
+              {heatCheck.attention.length === 0 ? (
+                <div className="dashboard-empty-state dashboard-empty-state-compact">No cooling or idle wrestlers flagged.</div>
+              ) : (
+                <div className="dashboard-list">
+                  {heatCheck.attention.map((row) => (
+                    <div key={row.id} className="dashboard-alert-row">
+                      <div>
+                        <div className="dashboard-list-title">{row.name}</div>
+                        <div className="dashboard-list-subtle">
+                          {row.status === 'Underused'
+                            ? row.daysIdle == null ? 'No completed matches yet' : `${row.daysIdle} days since last result`
+                            : `Recent form ${row.recentRecord} needs a rebound`}
+                        </div>
+                      </div>
+                      <span className={`dashboard-badge ${row.status === 'Cooling' ? 'dashboard-badge-danger' : 'dashboard-badge-muted'}`}>
+                        {row.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DashboardPanel>
+
+        <DashboardPanel
+          title="Universe News"
+          count={`${universeNews.length} items`}
+          empty={universeNews.length === 0}
+          emptyText="Book results or story segments to generate the universe news feed."
+          className="dashboard-panel-feature"
+        >
+          <div className="dashboard-news-list">
+            {universeNews.map((item) => (
+              <div key={item.id} className="dashboard-news-item">
+                <div className="dashboard-news-marker" style={{ background: item.tone }} />
+                <div className="dashboard-list-main">
+                  <div className="dashboard-result-topline">
+                    <span className="dashboard-match-type" style={{ color: item.tone }}>{item.type}</span>
+                    <span className="dashboard-result-date">{formatUniverseDate(item.date)}</span>
+                  </div>
+                  <div className="dashboard-result-title">{item.headline}</div>
+                  <div className="dashboard-list-subtle">{item.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DashboardPanel>
       </section>
 
       <section className="dashboard-grid">
@@ -344,15 +637,7 @@ export default function Dashboard({ state }) {
             <div className="dashboard-panel-heading">Current Champions</div>
             <div className="dashboard-panel-count">{filteredTitles.length} title{filteredTitles.length !== 1 ? 's' : ''}</div>
           </div>
-          <div className="dashboard-filter-row">
-            <button type="button" className={`dashboard-filter-btn${titleShowFilter === 'all' ? ' active' : ''}`} onClick={() => setTitleShowFilter('all')}>All</button>
-            <button type="button" className={`dashboard-filter-btn${titleShowFilter === 'Universe' ? ' active' : ''}`} onClick={() => setTitleShowFilter('Universe')}>Universe</button>
-            {availableShowFilters.map((showName) => (
-              <button key={showName} type="button" className={`dashboard-filter-btn${titleShowFilter === showName ? ' active' : ''}`} onClick={() => setTitleShowFilter(showName)}>
-                {showName}
-              </button>
-            ))}
-          </div>
+          <FilterTabs options={titleFilterOptions} value={titleShowFilter} onChange={setTitleShowFilter} />
           {filteredTitles.length === 0 ? (
             <div className="dashboard-empty-state">No titles have been created yet.</div>
           ) : (
@@ -483,14 +768,7 @@ export default function Dashboard({ state }) {
             <div className="dashboard-panel-heading">Hot Feuds</div>
             <div className="dashboard-panel-count">{filteredHotStories.length} spotlighted</div>
           </div>
-          <div className="dashboard-filter-row">
-            <button type="button" className={`dashboard-filter-btn${storyShowFilter === 'all' ? ' active' : ''}`} onClick={() => setStoryShowFilter('all')}>All</button>
-            {availableShowFilters.map((showName) => (
-              <button key={showName} type="button" className={`dashboard-filter-btn${storyShowFilter === showName ? ' active' : ''}`} onClick={() => setStoryShowFilter(showName)}>
-                {showName}
-              </button>
-            ))}
-          </div>
+          <FilterTabs options={showFilterOptions} value={storyShowFilter} onChange={setStoryShowFilter} />
           {filteredHotStories.length === 0 ? (
             <div className="dashboard-empty-state">No active stories are running right now.</div>
           ) : (
@@ -518,14 +796,7 @@ export default function Dashboard({ state }) {
             <div className="dashboard-panel-heading">Top Ranked</div>
             <div className="dashboard-panel-count">{filteredRankings.length} shown</div>
           </div>
-          <div className="dashboard-filter-row">
-            <button type="button" className={`dashboard-filter-btn${rankingsShowFilter === 'all' ? ' active' : ''}`} onClick={() => setRankingsShowFilter('all')}>All</button>
-            {availableShowFilters.map((showName) => (
-              <button key={showName} type="button" className={`dashboard-filter-btn${rankingsShowFilter === showName ? ' active' : ''}`} onClick={() => setRankingsShowFilter(showName)}>
-                {showName}
-              </button>
-            ))}
-          </div>
+          <FilterTabs options={showFilterOptions} value={rankingsShowFilter} onChange={setRankingsShowFilter} />
           {filteredRankings.length === 0 ? (
             <div className="dashboard-empty-state">No rankings data yet.</div>
           ) : (
@@ -535,7 +806,7 @@ export default function Dashboard({ state }) {
                   <div className="dashboard-ranking-rank">#{row.rank}</div>
                   <div className="dashboard-list-main">
                     <div className="dashboard-list-title">{row.name}</div>
-                    <div className="dashboard-list-subtle">Record {row.record} • PRS {Math.round(row.prs)}</div>
+                    <div className="dashboard-list-subtle">Record {row.record} - PRS {Math.round(row.prs)}</div>
                   </div>
                   <span className="dashboard-badge dashboard-badge-muted">{row.titles} title{row.titles !== 1 ? 's' : ''}</span>
                 </div>
@@ -558,7 +829,7 @@ export default function Dashboard({ state }) {
                   <div className="dashboard-ranking-rank">{row.delta > 0 ? 'UP' : 'DN'}</div>
                   <div className="dashboard-list-main">
                     <div className="dashboard-list-title">{row.name}</div>
-                    <div className="dashboard-list-subtle">{row.show} • PRS {Math.round(row.previousPrs)} → {Math.round(row.currentPrs)}</div>
+                    <div className="dashboard-list-subtle">{row.show} - PRS {Math.round(row.previousPrs)} to {Math.round(row.currentPrs)}</div>
                   </div>
                   <span
                     className="dashboard-badge"
