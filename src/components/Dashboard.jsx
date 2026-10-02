@@ -28,6 +28,8 @@ function getTeamsFromMatch(match) {
   if (match.mode === '3tag' && participantIds.length === 6) {
     return [participantIds.slice(0, 2), participantIds.slice(2, 4), participantIds.slice(4, 6)]
   }
+  const teamSize = { '4v4': 4, '5v5': 5, '6v6': 6 }[match.mode]
+  if (teamSize && participantIds.length === teamSize * 2) return [participantIds.slice(0, teamSize), participantIds.slice(teamSize)]
   if (match.mode === 'handicap' && participantIds.length >= 3 && participantIds.length <= 6) {
     return [participantIds.slice(0, 1), participantIds.slice(1)]
   }
@@ -420,8 +422,8 @@ export default function Dashboard({ state }) {
   function renderMatchLabel(match) {
     const participantIds = getParticipantIds(match)
     const participantNames = participantIds.map((id) => getW(id)?.name || 'Unknown')
-    if (match.mode === 'tag' || match.mode === 'trios' || match.mode === '3tag') {
-      const teamSize = match.mode === 'trios' ? 3 : 2
+    if (match.mode === 'tag' || match.mode === 'trios' || match.mode === '3tag' || ['4v4', '5v5', '6v6'].includes(match.mode)) {
+      const teamSize = { tag: 2, trios: 3, '3tag': 2, '4v4': 4, '5v5': 5, '6v6': 6 }[match.mode]
       const teams = []
       for (let i = 0; i < participantNames.length; i += teamSize) {
         teams.push(participantNames.slice(i, i + teamSize).join(' / '))

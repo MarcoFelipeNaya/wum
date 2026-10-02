@@ -6,7 +6,10 @@ function normalizeMode(match, participantIds) {
   if (count === 4 && ['free_for_all', 'handicap', 'tag'].includes(mode)) return mode
   if (count === 5 && ['free_for_all', 'handicap'].includes(mode)) return mode
   if (count === 6 && ['free_for_all', 'handicap', 'trios', '3tag'].includes(mode)) return mode
-  if ([7, 8, 9, 10, 20, 30].includes(count)) return mode
+  if ([7, 9, 11, 20, 30].includes(count)) return mode
+  if (count === 8 && ['free_for_all', '4v4'].includes(mode)) return mode
+  if (count === 10 && ['free_for_all', '5v5'].includes(mode)) return mode
+  if (count === 12 && ['free_for_all', '6v6'].includes(mode)) return mode
   return 'free_for_all'
 }
 
@@ -27,6 +30,8 @@ function getTeamsFromMatch(match) {
   if (mode === '3tag' && count === 6) {
     return [participantIds.slice(0, 2), participantIds.slice(2, 4), participantIds.slice(4, 6)]
   }
+  const teamSize = { '4v4': 4, '5v5': 5, '6v6': 6 }[mode]
+  if (teamSize && count === teamSize * 2) return [participantIds.slice(0, teamSize), participantIds.slice(teamSize)]
   return null
 }
 

@@ -21,8 +21,17 @@ const MATCH_FORMATS = [
   { value: 'singles', label: 'Singles' },
   { value: 'tag', label: 'Tag' },
   { value: 'trios', label: 'Trios' },
+  { value: '4v4', label: '4 vs 4' },
+  { value: '5v5', label: '5 vs 5' },
+  { value: '6v6', label: '6 vs 6' },
   { value: 'title', label: 'Title' },
 ]
+
+const TEAM_FORMAT_SIZES = { tag: 2, trios: 3, '4v4': 4, '5v5': 5, '6v6': 6 }
+
+function getTeamFormatSize(mode) {
+  return TEAM_FORMAT_SIZES[mode] || 0
+}
 
 const RELATIONSHIP_STORY_MODE_TYPES = [
   'Rival',
@@ -131,15 +140,15 @@ function getBookingOptionLabel(option) {
 }
 
 function getMatchSlotLabel(mode, index) {
-  if (mode === 'tag') return index < 2 ? `Team A ${index + 1}` : `Team B ${index - 1}`
-  if (mode === 'trios') return index < 3 ? `Team A ${index + 1}` : `Team B ${index - 2}`
+  const teamSize = getTeamFormatSize(mode)
+  if (teamSize) return index < teamSize ? `Team A ${index + 1}` : `Team B ${index - teamSize + 1}`
   return index === 0 ? 'Side A' : 'Side B'
 }
 
 function getMatchHeadline(wrestlers, participantIds, mode) {
   const names = participantIds.map((id) => getPersonName(wrestlers, id))
-  if (mode === 'tag') return `${names.slice(0, 2).join(' / ')} vs ${names.slice(2).join(' / ')}`
-  if (mode === 'trios') return `${names.slice(0, 3).join(' / ')} vs ${names.slice(3).join(' / ')}`
+  const teamSize = getTeamFormatSize(mode)
+  if (teamSize) return `${names.slice(0, teamSize).join(' / ')} vs ${names.slice(teamSize).join(' / ')}`
   return names.join(' vs ')
 }
 
@@ -328,6 +337,9 @@ export default function Creative({
       return (title.show || 'Universe') === matchForm.show || title.show === 'Universe'
     })
     const autoFormats = ['singles', 'tag', 'trios']
+    if (talentPool.length >= 8) autoFormats.push('4v4')
+    if (talentPool.length >= 10) autoFormats.push('5v5')
+    if (talentPool.length >= 12) autoFormats.push('6v6')
     const requestedFormat = matchForm.format === 'auto'
       ? autoFormats[Math.floor(Math.abs(Math.sin((seed + 5) * 65537) * 1000000)) % autoFormats.length]
       : matchForm.format
@@ -538,7 +550,8 @@ export default function Creative({
       }
     }
 
-    const needed = effectiveMode === 'trios' ? 6 : effectiveMode === 'tag' ? 4 : 2
+    const teamSize = getTeamFormatSize(effectiveMode)
+    const needed = teamSize ? teamSize * 2 : 2
     const getWeightedTalent = (selectedIds = []) => talentPool.map((wrestler) => {
       const ranking = rankMap.get(wrestler.id)
       const lastMatch = [...matches].reverse().find((match) => getParticipantIds(match).includes(wrestler.id))
@@ -563,10 +576,8 @@ export default function Creative({
     if (picked.length < needed) return null
     const isRecentRematch = matchForm.avoidRematches && recentMatchKeys.has(getRecentMatchKey(picked))
     const names = picked.map((id) => getPersonName(wrestlers, id))
-    const label = effectiveMode === 'tag'
-      ? `${names.slice(0, 2).join(' / ')} vs ${names.slice(2).join(' / ')}`
-      : effectiveMode === 'trios'
-      ? `${names.slice(0, 3).join(' / ')} vs ${names.slice(3).join(' / ')}`
+    const label = teamSize
+      ? `${names.slice(0, teamSize).join(' / ')} vs ${names.slice(teamSize).join(' / ')}`
       : names.join(' vs ')
 
     const pickReasons = picked.map(getTalentPickReason).filter(Boolean)
@@ -581,8 +592,8 @@ export default function Creative({
       headline: label,
       reason: isRecentRematch
         ? 'Strong matchup, but it was booked recently. Refresh for a cleaner option.'
-        : `${effectiveMode === 'tag' || effectiveMode === 'trios' ? 'No eligible saved teams were available, so HeatSpark built a one-night lineup. ' : ''}${[relationshipLine, ...pickReasons].filter(Boolean).join(' | ')}`,
-      notes: effectiveMode === 'tag' || effectiveMode === 'trios' ? 'Creative Spark suggestion - one-night team lineup' : 'Creative Spark suggestion',
+        : `${teamSize ? 'No eligible saved teams were available, so HeatSpark built a one-night lineup. ' : ''}${[relationshipLine, ...pickReasons].filter(Boolean).join(' | ')}`,
+      notes: teamSize ? 'Creative Spark suggestion - one-night team lineup' : 'Creative Spark suggestion',
       stipulation: matchForm.goal === 'faction_warfare' ? 'Faction Warfare' : '',
       goalLabel: matchForm.goal === 'faction_warfare' ? 'Faction Warfare' : null,
     }

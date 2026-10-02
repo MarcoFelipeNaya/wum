@@ -121,6 +121,8 @@ export default function Calendar({
       if (match.mode === 'tag' && participantIds.length === 4) return [participantIds.slice(0, 2), participantIds.slice(2, 4)]
       if (match.mode === 'trios' && participantIds.length === 6) return [participantIds.slice(0, 3), participantIds.slice(3, 6)]
       if (match.mode === '3tag' && participantIds.length === 6) return [participantIds.slice(0, 2), participantIds.slice(2, 4), participantIds.slice(4, 6)]
+      const teamSize = { '4v4': 4, '5v5': 5, '6v6': 6 }[match.mode]
+      if (teamSize && participantIds.length === teamSize * 2) return [participantIds.slice(0, teamSize), participantIds.slice(teamSize)]
       if (match.mode === 'handicap' && participantIds.length >= 3 && participantIds.length <= 6) return [participantIds.slice(0, 1), participantIds.slice(1)]
       return null
     }

@@ -227,7 +227,10 @@ function getAllowedModes(count) {
   if (count === 4) return ['free_for_all', 'handicap', 'tag']
   if (count === 5) return ['free_for_all', 'handicap']
   if (count === 6) return ['free_for_all', 'handicap', 'trios', '3tag']
-  if ([7, 8, 9, 10].includes(count)) return ['free_for_all']
+  if ([7, 9, 11].includes(count)) return ['free_for_all']
+  if (count === 8) return ['free_for_all', '4v4']
+  if (count === 10) return ['free_for_all', '5v5']
+  if (count === 12) return ['free_for_all', '6v6']
   if ([20, 30].includes(count)) return ['royal_rumble']
   return ['free_for_all']
 }
@@ -256,9 +259,10 @@ function getMatchType(participantIds = [], mode = 'free_for_all') {
     return '6-Pack Challenge'
   }
   if (count === 7) return '7-Person Match'
-  if (count === 8) return '8-Person Match'
+  if (count === 8) return safeMode === '4v4' ? '4 vs 4' : '8-Person Match'
   if (count === 9) return '9-Person Match'
-  if (count === 10) return '10-Person Match'
+  if (count === 10) return safeMode === '5v5' ? '5 vs 5' : '10-Person Match'
+  if (count === 12) return safeMode === '6v6' ? '6 vs 6' : '12-Person Match'
   if (count === 20) return 'Royal Rumble'
   if (count === 30) return 'Royal Rumble'
   return `${count}-Person Match`
@@ -283,6 +287,11 @@ function getTeamsFromMatch(match) {
 
   if (mode === '3tag' && count === 6) {
     return [participantIds.slice(0, 2), participantIds.slice(2, 4), participantIds.slice(4, 6)]
+  }
+
+  const teamSize = { '4v4': 4, '5v5': 5, '6v6': 6 }[mode]
+  if (teamSize && count === teamSize * 2) {
+    return [participantIds.slice(0, teamSize), participantIds.slice(teamSize, teamSize * 2)]
   }
 
   return null

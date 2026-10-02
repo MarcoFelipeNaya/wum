@@ -19,7 +19,7 @@ import {
 } from 'react-icons/fi'
 import './DayMatchesModal.css'
 
-const ALLOWED_PARTICIPANT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30]
+const ALLOWED_PARTICIPANT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 20, 30]
 const FINISH_TYPES = ['Clean Pinfall', 'Submission', 'DQ', 'Count Out', 'Interference', 'Roll-Up', 'Knockout', 'Ref Stoppage', 'No Contest']
 
 const SEGMENT_CATEGORIES = [
@@ -120,7 +120,10 @@ function getAllowedModes(count) {
   if (count === 4) return ['free_for_all', 'handicap', 'tag']
   if (count === 5) return ['free_for_all', 'handicap']
   if (count === 6) return ['free_for_all', 'handicap', 'trios', '3tag']
-  if ([7, 8, 9, 10].includes(count)) return ['free_for_all']
+  if ([7, 9, 11].includes(count)) return ['free_for_all']
+  if (count === 8) return ['free_for_all', '4v4']
+  if (count === 10) return ['free_for_all', '5v5']
+  if (count === 12) return ['free_for_all', '6v6']
   if ([20, 30].includes(count)) return ['royal_rumble']
   return ['free_for_all']
 }
@@ -147,9 +150,10 @@ function getMatchTypeLabel(count, mode) {
     return '6-Pack Challenge'
   }
   if (count === 7) return '7-Person Match'
-  if (count === 8) return '8-Person Match'
+  if (count === 8) return safeMode === '4v4' ? '4 vs 4' : '8-Person Match'
   if (count === 9) return '9-Person Match'
-  if (count === 10) return '10-Person Match'
+  if (count === 10) return safeMode === '5v5' ? '5 vs 5' : '10-Person Match'
+  if (count === 12) return safeMode === '6v6' ? '6 vs 6' : '12-Person Match'
   if ([20, 30].includes(count)) return 'Royal Rumble'
   return `${count}-Person Match`
 }
@@ -167,6 +171,11 @@ function getTeamLayout(count, mode) {
   }
   if (safeMode === '3tag' && count === 6) {
     return { isTeamBased: true, teams: [{ label: 'Team A', size: 2 }, { label: 'Team B', size: 2 }, { label: 'Team C', size: 2 }] }
+  }
+
+  const teamSize = { '4v4': 4, '5v5': 5, '6v6': 6 }[safeMode]
+  if (teamSize && count === teamSize * 2) {
+    return { isTeamBased: true, teams: [{ label: 'Team A', size: teamSize }, { label: 'Team B', size: teamSize }] }
   }
 
   return { isTeamBased: false, teams: [] }
@@ -987,6 +996,9 @@ export default function DayMatchesModal({
     { label: 'Tag Team', count: 4, mode: 'tag' },
     { label: 'Six-Man Tag', count: 6, mode: 'trios' },
     { label: 'Triple Threat Tag', count: 6, mode: '3tag' },
+    { label: '4 vs 4', count: 8, mode: '4v4' },
+    { label: '5 vs 5', count: 10, mode: '5v5' },
+    { label: '6 vs 6', count: 12, mode: '6v6' },
     { label: '10-Person', count: 10, mode: 'free_for_all' },
   ]
   const quickSegmentTemplates = [
