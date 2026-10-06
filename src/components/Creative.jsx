@@ -5,6 +5,7 @@ import { addDays, DAY_NAMES, fmt, getCustomDow, formatUniverseDate, daysBetween 
 import { getCalendarEventsOnDate, specialShowOccursOnDate } from '../utils/calendarEvents.js'
 import { RIVALRY_STORY_TEMPLATES } from '../utils/heatSparkTemplates.js'
 import { buildRankings } from '../utils/rankings.js'
+import { HEATSPARK_WHEEL_CATEGORIES, HEATSPARK_WHEEL_ENTRIES } from '../utils/heatSparkWheelEntries.js'
 import './Creative.css'
 
 const MATCH_GOALS = [
@@ -31,6 +32,16 @@ const TEAM_FORMAT_SIZES = { tag: 2, trios: 3, '4v4': 4, '5v5': 5, '6v6': 6 }
 
 function getTeamFormatSize(mode) {
   return TEAM_FORMAT_SIZES[mode] || 0
+}
+
+function getSecureRandomIndex(length) {
+  if (!length) return -1
+  const randomValues = new Uint32Array(1)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(randomValues)
+    return randomValues[0] % length
+  }
+  return Math.floor(Math.random() * length)
 }
 
 const RELATIONSHIP_STORY_MODE_TYPES = [
@@ -221,6 +232,12 @@ export default function Creative({
   const [segmentSeed, setSegmentSeed] = useState(1)
   const [storySeed, setStorySeed] = useState(1)
   const [booking, setBooking] = useState(null)
+  const [wheelCategory, setWheelCategory] = useState('All')
+  const [wheelEnabledIds, setWheelEnabledIds] = useState(() => new Set(HEATSPARK_WHEEL_ENTRIES.map((entry) => entry.id)))
+  const [wheelRotation, setWheelRotation] = useState(0)
+  const [wheelSpinning, setWheelSpinning] = useState(false)
+  const [wheelResult, setWheelResult] = useState(null)
+  const [wheelStoryDraft, setWheelStoryDraft] = useState(null)
 
   const activeStories = stories.filter((story) => story.status !== 'Concluded')
   const competitiveRoster = wrestlers.filter((wrestler) => (wrestler.role || 'wrestler') === 'wrestler')
@@ -233,6 +250,87 @@ export default function Creative({
     () => new Set(matches.slice(-16).map((match) => getRecentMatchKey(getParticipantIds(match)))),
     [matches]
   )
+
+  const wheelEntries = useMemo(() => {
+    const activeCount = competitiveRoster.filter((wrestler) => wrestler.status === 'Active').length
+    const brandCount = new Set(competitiveRoster.map((wrestler) => wrestler.show).filter(Boolean)).size
+    const championCount = titles.filter((title) => getChampIds(title).length > 0).length
+    const factionCount = factions.length
+    const relationshipContext = relationships.length > 0 || activeStories.length > 0
+    const hasBriefcase = titles.some((title) => /money|briefcase|mitb/i.test(title.name || ''))
+
+    const isAvailable = (entry) => {
+      if (['brand-transfer', 'brand-invasion', 'wild-card', 'random-draft', 'draft-three', 'mega-star-switch', 'nxt-call-up', 'interbrand-showdown', 'brand-supremacy', 'loser-changes-brand'].includes(entry.id)) return brandCount >= 2
+      if (['protected-champion', 'career-vs-title', 'title-for-title', 'no-champions-month', 'champion-handicap', 'champion-gauntlet', 'title-scramble', 'open-challenge-chaos', 'triple-threat-addition', 'champion-injury', 'champion-vs-world'].includes(entry.id)) return championCount > 0
+      if (['mitb-stolen', 'mitb-exchange'].includes(entry.id)) return hasBriefcase
+      if (entry.id === 'faction-collapse') return factionCount > 0
+      if (entry.id === 'faction-war') return factionCount >= 2
+      if (['rivalry-reset', 'grudge-rekindled', 'last-man-standing', 'revenge-clause'].includes(entry.id)) return relationshipContext
+      if (['low-card-rumble', 'champion-vs-world'].includes(entry.id)) return activeCount >= 20
+      if (['championship-contender-series', 'king-queen-ring'].includes(entry.id)) return activeCount >= 4
+      return true
+    }
+
+    return HEATSPARK_WHEEL_ENTRIES.filter((entry) => wheelEnabledIds.has(entry.id) && (wheelCategory === 'All' || entry.category === wheelCategory) && isAvailable(entry))
+  }, [wheelCategory, wheelEnabledIds, competitiveRoster, titles, factions, relationships, activeStories])
+
+  const wheelGradient = useMemo(() => {
+    if (wheelEntries.length === 0) return 'conic-gradient(var(--bg4) 0 100%)'
+    const colors = ['#a63f25', '#27232a']
+    const slice = 100 / wheelEntries.length
+    return `conic-gradient(${wheelEntries.map((entry, index) => `${colors[index % colors.length]} ${index * slice}% ${(index + 1) * slice}%`).join(', ')})`
+  }, [wheelEntries])
+
+  const spinWheel = () => {
+    if (wheelSpinning || wheelEntries.length === 0) return
+    const resultIndex = getSecureRandomIndex(wheelEntries.length)
+    const selected = wheelEntries[resultIndex]
+    const slice = 360 / wheelEntries.length
+    const target = wheelRotation + 1800 + (360 - ((resultIndex + 0.5) * slice))
+    setWheelResult(selected)
+    setWheelStoryDraft(null)
+    setWheelRotation(target)
+    setWheelSpinning(true)
+    window.setTimeout(() => setWheelSpinning(false), 1800)
+  }
+
+  const toggleWheelEntry = (entryId) => {
+    setWheelEnabledIds((current) => {
+      const next = new Set(current)
+      if (next.has(entryId)) next.delete(entryId)
+      else next.add(entryId)
+      return next
+    })
+  }
+
+  const buildWheelStory = () => {
+    if (!wheelResult) return
+    const storyPool = competitiveRoster.filter((wrestler) => wrestler.status === 'Active' && (matchForm.show === 'all' || wrestler.show === matchForm.show))
+    if (storyPool.length < 2) {
+      showToast('At least two active wrestlers are needed to build a story')
+      return
+    }
+    const firstIndex = getSecureRandomIndex(storyPool.length)
+    const first = storyPool[firstIndex]
+    const second = storyPool[(firstIndex + 1 + getSecureRandomIndex(storyPool.length - 1)) % storyPool.length]
+    const name = `${wheelResult.title}: ${first.name} and ${second.name}`
+    const why = `${wheelResult.description} ${getTalentPickReason(first.id)} ${getTalentPickReason(second.id)}`
+    const draft = {
+      name,
+      templateKey: `wheel-${wheelResult.id}`,
+      arcType: 'story',
+      arcLabel: 'Chaos Arc',
+      participants: [{ type: 'wrestler', id: first.id }, { type: 'wrestler', id: second.id }],
+      hook: `${wheelResult.description} The wheel has put ${first.name} and ${second.name} at the center of it.`,
+      why,
+      openingSegment: `${first.name} and ${second.name} are pulled into the consequences of ${wheelResult.title.toLowerCase()} before either can prepare.`,
+      openingMatch: `${first.name} vs ${second.name} becomes the first test of the new situation.`,
+      payoff: `The ${wheelResult.title.toLowerCase()} reaches its payoff when ${first.name} and ${second.name} decide who controls the next chapter.`,
+    }
+    draft.description = `${draft.hook}\n\nWhy it works: ${draft.why}\n\nOpening beat: ${draft.openingSegment}\nOpening match: ${draft.openingMatch}\nPayoff: ${draft.payoff}`
+    setWheelStoryDraft(draft)
+    window.setTimeout(() => document.querySelector('.creative-story-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
 
   const getTalentPickReason = (wrestlerId) => {
     const wrestler = wrestlers.find((item) => item.id === wrestlerId)
@@ -1002,20 +1100,22 @@ export default function Creative({
   }
 
   const handleCreateStory = () => {
-    if (!storyIdea || !addStory) {
+    const storyToCreate = wheelStoryDraft || storyIdea
+    if (!storyToCreate || !addStory) {
       showToast('Story creation is not available')
       return
     }
     addStory({
-      name: storyIdea.name,
-      heatSparkTemplateKey: storyIdea.templateKey,
-      type: storyIdea.arcType,
+      name: storyToCreate.name,
+      heatSparkTemplateKey: storyToCreate.templateKey,
+      type: storyToCreate.arcType,
       status: 'Building',
-      participants: storyIdea.participants,
-      description: storyIdea.description,
+      participants: storyToCreate.participants,
+      description: storyToCreate.description,
       segments: [],
     })
-    showToast(`${storyIdea.name} created`)
+    setWheelStoryDraft(null)
+    showToast(`${storyToCreate.name} created`)
   }
 
   return (
@@ -1097,6 +1197,61 @@ export default function Creative({
 
           </section>
 
+          <section className="creative-panel creative-wheel-panel glass">
+            <div className="creative-panel-header">
+              <div>
+                <h2>Chaos Wheel</h2>
+                <p>Let the universe throw one controlled problem at your booking team.</p>
+              </div>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => setWheelEnabledIds(new Set(HEATSPARK_WHEEL_ENTRIES.map((entry) => entry.id)))}>Reset List</button>
+            </div>
+            <div className="creative-wheel-controls">
+              <label>
+                Category
+                <select value={wheelCategory} onChange={(e) => setWheelCategory(e.target.value)}>
+                  {HEATSPARK_WHEEL_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+                </select>
+              </label>
+              <span className="creative-wheel-count">{wheelEntries.length} outcomes available</span>
+            </div>
+            <div className="creative-wheel-layout">
+              <div className="creative-wheel-stage">
+                <div className={"creative-wheel-pointer " + (wheelSpinning ? "is-spinning" : "")} />
+                <div className={"creative-wheel " + (wheelSpinning ? "is-spinning" : "")} style={{ background: wheelGradient, transform: "rotate(" + wheelRotation + "deg)" }}>
+                  <div className="creative-wheel-center">
+                    <FiZap />
+                    <span>SPIN</span>
+                  </div>
+                </div>
+                <button className="btn btn-primary creative-wheel-spin" type="button" onClick={spinWheel} disabled={wheelSpinning || wheelEntries.length === 0}>
+                  <FiRefreshCw /> {wheelSpinning ? "Spinning..." : "Spin the Wheel"}
+                </button>
+              </div>
+              <div className="creative-wheel-result-wrap">
+                {wheelResult ? (
+                  <div className="creative-wheel-result">
+                    <div className="creative-suggestion-label">Wheel Result · {wheelResult.category}</div>
+                    <h3>{wheelResult.title}</h3>
+                    <p>{wheelResult.description}</p>
+                    <span>Prompt generated. Apply the consequence manually when you are ready to book it.</span>
+                    <button className="btn btn-primary creative-wheel-build" type="button" onClick={buildWheelStory}>
+                      <FiZap /> Build Story
+                    </button>
+                  </div>
+                ) : (
+                  <div className="creative-wheel-empty">The wheel is loaded with booking complications, twists, pushes, and stipulations.</div>
+                )}
+                <div className="creative-wheel-list">
+                  {wheelEntries.map((entry) => (
+                    <label key={entry.id} className="creative-wheel-entry">
+                      <input type="checkbox" checked={wheelEnabledIds.has(entry.id)} onChange={() => toggleWheelEntry(entry.id)} />
+                      <span><strong>{entry.title}</strong><small>{entry.description}</small></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
           <section className="creative-panel creative-story-panel glass">
             <div className="creative-panel-header">
               <div>
@@ -1128,23 +1283,23 @@ export default function Creative({
               </label>
             </div>
 
-            {storyIdea ? (
+            {(wheelStoryDraft || storyIdea) ? (
               <div className="creative-story-card">
                 <div className="creative-story-main">
-                  <div className="creative-suggestion-label">{storyIdea.arcLabel}</div>
-                  <h3>{storyIdea.name}</h3>
-                  <p>{storyIdea.hook}</p>
+                  <div className="creative-suggestion-label">{(wheelStoryDraft || storyIdea).arcLabel}</div>
+                  <h3>{(wheelStoryDraft || storyIdea).name}</h3>
+                  <p>{(wheelStoryDraft || storyIdea).hook}</p>
                   <div className="creative-chip-row">
-                    {storyIdea.participants.map((participant) => (
+                    {(wheelStoryDraft || storyIdea).participants.map((participant) => (
                       <span key={`${participant.type}-${participant.id}`}>{getStoryParticipantName(participant)}</span>
                     ))}
                   </div>
                 </div>
                 <div className="creative-story-outline">
-                  <div><span>Why</span><strong>{storyIdea.why}</strong></div>
-                  <div><span>Opening Segment</span><strong>{storyIdea.openingSegment}</strong></div>
-                  <div><span>Opening Match</span><strong>{storyIdea.openingMatch}</strong></div>
-                  <div><span>Payoff</span><strong>{storyIdea.payoff}</strong></div>
+                  <div><span>Why</span><strong>{(wheelStoryDraft || storyIdea).why}</strong></div>
+                  <div><span>Opening Segment</span><strong>{(wheelStoryDraft || storyIdea).openingSegment}</strong></div>
+                  <div><span>Opening Match</span><strong>{(wheelStoryDraft || storyIdea).openingMatch}</strong></div>
+                  <div><span>Payoff</span><strong>{(wheelStoryDraft || storyIdea).payoff}</strong></div>
                 </div>
                 <button className="btn btn-primary" type="button" onClick={handleCreateStory}>
                   <FiZap /> Create Story
